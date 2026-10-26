@@ -23,6 +23,13 @@ function safeName(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
 }
 
+function safeReason(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error))
+    .replace(/Bearer\s+[A-Za-z0-9._~+/-]{10,}=*/gi, "Bearer [redacted]")
+    .replace(/sk-[A-Za-z0-9_-]{10,}/g, "sk-[redacted]")
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "AIza[redacted]");
+}
+
 async function connectServer(server: McpServer): Promise<Client> {
   const client = new Client({ name: "hasar-addon", version: "0.1.0" });
   const headers = server.headers;
@@ -72,7 +79,7 @@ export async function openMcp(config: Config): Promise<McpSession> {
       }
     } catch (error) {
       // A broken MCP server must not take down the whole assistant.
-      console.warn(`MCP ${server.name} unavailable:`, error);
+      console.warn(`MCP ${server.name} unavailable: ${safeReason(error)}`);
     }
   }
 

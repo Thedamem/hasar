@@ -2,6 +2,7 @@ import { SocksProxyAgent } from "socks-proxy-agent";
 import WebSocket from "ws";
 
 import type { Config } from "../config.js";
+import { geminiHeaders, geminiLiveUrl } from "../gemini.js";
 import type { ToolDefinition } from "./types.js";
 
 export type LiveAudio = {
@@ -43,10 +44,7 @@ export function geminiLive(
   if (!config.gemini.liveModel) return Promise.reject(new Error("Gemini live model is empty"));
 
   const model = config.gemini.liveModel.replace(/^models\//, "");
-  const url = new URL(
-    "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent",
-  );
-  url.searchParams.set("key", config.gemini.apiKey);
+  const url = geminiLiveUrl(config);
   const agent = config.proxy.socks5 ? new SocksProxyAgent(config.proxy.socks5) : undefined;
 
   return new Promise((resolve, reject) => {
@@ -54,7 +52,10 @@ export function geminiLive(
     let sampleRate = 24_000;
     let transcript = "";
     let settled = false;
-    const socket = new WebSocket(url.toString(), { agent });
+    const socket = new WebSocket(url.toString(), {
+      agent,
+      headers: geminiHeaders(config.gemini.apiKey),
+    });
     const timer = setTimeout(() => {
       finish(new Error("Gemini Live request timed out"));
     }, 45_000);

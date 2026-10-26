@@ -1,4 +1,5 @@
 import type { Config } from "../config.js";
+import { geminiApiUrl, geminiHeaders } from "../gemini.js";
 import { requestJson } from "../http.js";
 
 type GeminiResponse = {
@@ -17,20 +18,23 @@ export async function chatGemini(
   if (!config.gemini.apiKey) throw new Error("Gemini API key is empty");
   if (!config.gemini.chatModel) throw new Error("Gemini chat model is empty");
   const model = config.gemini.chatModel.replace(/^models\//, "");
-  const url = new URL(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-  );
-  url.searchParams.set("key", config.gemini.apiKey);
 
-  const payload = (await requestJson(url.toString(), {
-    method: "POST",
-    proxy: config.proxy.socks5,
-    timeoutMs: 120_000,
-    body: {
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: "user", parts: [{ text }] }],
+  const payload = (await requestJson(
+    geminiApiUrl(config, `models/${encodeURIComponent(model)}:generateContent`),
+    {
+      method: "POST",
+      proxy: config.proxy.socks5,
+      timeoutMs: 120_000,
+      headers: {
+        accept: "application/json",
+        ...geminiHeaders(config.gemini.apiKey),
+      },
+      body: {
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: [{ text }] }],
+      },
     },
-  })) as GeminiResponse;
+  )) as GeminiResponse;
 
   const parts = payload.candidates?.[0]?.content?.parts ?? [];
   const textParts = parts

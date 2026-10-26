@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   ConfigSchema,
+  SECRET_MASK,
   loadConfig,
   redactedConfig,
   saveConfig,
@@ -13,48 +14,161 @@ import { listModels } from "./models.js";
 import { pairPlugin } from "./pairing.js";
 import { ask } from "./pipeline.js";
 
-const MASK = "••••••••";
 const dataDir = process.env.HASAR_DATA_DIR ?? "/data";
-const logLevel = process.env.LOG_LEVEL ?? "info";
+let logLevel = process.env.LOG_LEVEL ?? "info";
 
-const app = Fastify({ logger: { level: logLevel } });
+try {
+  const options = JSON.parse(
+    await readFile(`${dataDir}/options.json`, "utf8"),
+  ) as { log_level?: unknown };
+  if (typeof options.log_level === "string") logLevel = options.log_level;
+} catch {
+  // Local runs and tests do not have Supervisor options.
+}
+
+const app = Fastify({
+  bodyLimit: 1_048_576,
+  logger: {
+    level: logLevel,
+    redact: {
+      paths: [
+        "req.headers.authorization",
+        'req.headers["x-goog-api-key"]',
+        "req.headers.cookie",
+      ],
+      censor: "[redacted]",
+    },
+  },
+});
 let config: Config = await loadConfig(dataDir);
 
-async function loadUi(): Promise<string> {
-  for (const candidate of ["../ui/index.html", "./ui/index.html", "../src/ui/index.html"]) {
+function publicError(error: unknown): string {
+  return String(error)
+    .replace(/sk-[A-Za-z0-9_-]{10,}/g, "sk-[redacted]")
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "AIza[redacted]")
+    .replace(/Bearer\s+[A-Za-z0-9._~+/-]{10,}=*/gi, "Bearer [redacted]")
+    .replace(/([?&]key=)[^&\s]+/gi, "$1[redacted]");
+}
+
+function zodMessage(error: z.ZodError): string {
+  return error.issues
+    .map((issue) => {
+      const path = issue.path.join(".");
+      return path ? `${path}: ${issue.message}` : issue.message;
+    })
+    .join("; ");
+}
+
+async function loadUiAsset(name: string): Promise<string> {
+  for (const candidate of [
+    `../ui/${name}`,
+    `./ui/${name}`,
+    `../src/ui/${name}`,
+  ]) {
     try {
       return await readFile(new URL(candidate, import.meta.url), "utf8");
     } catch {
       // Try the next layout (dist/ui in Docker, src/ui with tsx).
     }
   }
-  throw new Error("ui/index.html not found");
+  throw new Error(`ui/${name} not found`);
 }
 
-const ui = await loadUi();
+const ui = await loadUiAsset("index.html");
+const styles = await loadUiAsset("styles.css");
+const appJs = await loadUiAsset("app.js");
 
 function mergeSecrets(current: Config, next: Config): Config {
-  if (next.openai.apiKey === MASK) next.openai.apiKey = current.openai.apiKey;
-  if (next.gemini.apiKey === MASK) next.gemini.apiKey = current.gemini.apiKey;
-  if (next.plugin.token === MASK) next.plugin.token = current.plugin.token;
+  if (next.openai.apiKey === SECRET_MASK) {
+    next.openai.apiKey = current.openai.apiKey;
+  }
+  if (next.gemini.apiKey === SECRET_MASK) {
+    next.gemini.apiKey = current.gemini.apiKey;
+  }
+  if (next.plugin.token === SECRET_MASK) {
+    next.plugin.token = current.plugin.token;
+  }
+  if (next.proxy.socks5 === SECRET_MASK) {
+    next.proxy.socks5 = current.proxy.socks5;
+  }
   next.mcpServers = next.mcpServers.map((server) => {
-    const previous = current.mcpServers.find((item) => item.name === server.name);
-    if (!previous) return server;
-    const headers = { ...server.headers };
-    for (const [key, value] of Object.entries(headers)) {
-      if (value === MASK && previous.headers[key] !== undefined) {
-        headers[key] = previous.headers[key] as string;
-      }
+    const previous =
+      current.mcpServers.find((item) => item.name === server.name) ??
+      (server.url
+        ? current.mcpServers.find((item) => item.url === server.url)
+        : undefined) ??
+      (server.command
+        ? current.mcpServers.find((item) => item.command === server.command)
+        : undefined);
+    const headers: Record<string, string> = {};
+    for (const [key, value] of Object.entries(server.headers)) {
+      headers[key] =
+        value === SECRET_MASK ? (previous?.headers[key] ?? "") : value;
     }
     return { ...server, headers };
   });
   return next;
 }
 
-app.get("/health", async () => ({ status: "ok", version: "0.1.0" }));
+app.addHook("onSend", async (request, reply, payload) => {
+  reply.header("x-content-type-options", "nosniff");
+  reply.header("referrer-policy", "no-referrer");
+  reply.header("x-frame-options", "SAMEORIGIN");
+  if (request.url.startsWith("/api/")) {
+    reply.header("cache-control", "no-store");
+  }
+  if (
+    request.url === "/" ||
+    request.url.startsWith("/?") ||
+    request.url.startsWith("/index.html")
+  ) {
+    reply.header("cache-control", "no-cache");
+    reply.header(
+      "content-security-policy",
+      "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'",
+    );
+  }
+  return payload;
+});
+
+app.setErrorHandler((error, request, reply) => {
+  if (error instanceof z.ZodError) {
+    return reply
+      .code(400)
+      .send({ error: zodMessage(error), issues: error.issues });
+  }
+  const statusCode = (error as { statusCode?: number }).statusCode;
+  const status =
+    statusCode && statusCode >= 400 && statusCode < 500 ? statusCode : 500;
+  if (status >= 500) {
+    request.log.error({ err: error }, "request failed");
+    return reply.code(status).send({ error: "internal error" });
+  }
+  return reply.code(status).send({ error: publicError(error) });
+});
+
+app.get("/health", async () => ({ status: "ok", version: "0.1.1" }));
 
 app.get("/", async (_request, reply) => {
   return reply.type("text/html; charset=utf-8").send(ui);
+});
+
+app.get("/index.html", async (_request, reply) => {
+  return reply.type("text/html; charset=utf-8").send(ui);
+});
+
+app.get("/styles.css", async (_request, reply) => {
+  reply.header("cache-control", "no-cache");
+  return reply.type("text/css; charset=utf-8").send(styles);
+});
+
+app.get("/app.js", async (_request, reply) => {
+  reply.header("cache-control", "no-cache");
+  return reply.type("text/javascript; charset=utf-8").send(appJs);
+});
+
+app.get("/favicon.ico", async (_request, reply) => {
+  return reply.code(204).send();
 });
 
 app.get("/api/config", async () => redactedConfig(config));
@@ -64,24 +178,66 @@ app.put("/api/config", async (request, reply) => {
     const parsed = ConfigSchema.parse(request.body);
     config = mergeSecrets(config, parsed);
     await saveConfig(dataDir, config);
+    request.log.info("configuration saved");
     return redactedConfig(config);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return reply.code(400).send({ error: "invalid config", issues: error.issues });
+      return reply
+        .code(400)
+        .send({ error: zodMessage(error), issues: error.issues });
     }
-    return reply.code(500).send({ error: String(error) });
+    request.log.error({ err: error }, "cannot save configuration");
+    return reply.code(500).send({ error: publicError(error) });
   }
 });
 
+const ModelRequestSchema = z.object({
+  provider: z.enum(["openai", "gemini"]).optional(),
+  openai: z
+    .object({
+      baseUrl: z.string().optional(),
+      apiKey: z.string().optional(),
+    })
+    .optional(),
+  gemini: z
+    .object({
+      baseUrl: z.string().optional(),
+      apiKey: z.string().optional(),
+    })
+    .optional(),
+});
+
 app.post("/api/models", async (request, reply) => {
-  const body = z
-    .object({ provider: z.enum(["openai", "gemini"]).optional() })
-    .parse(request.body ?? {});
-  const selected = { ...config, provider: body.provider ?? config.provider };
+  const body = ModelRequestSchema.parse(request.body ?? {});
+  const selected = structuredClone(config);
+  if (body.provider) selected.provider = body.provider;
+  if (body.openai) {
+    if (body.openai.baseUrl !== undefined) {
+      selected.openai.baseUrl = body.openai.baseUrl;
+    }
+    if (body.openai.apiKey !== undefined && body.openai.apiKey !== SECRET_MASK) {
+      selected.openai.apiKey = body.openai.apiKey;
+    }
+  }
+  if (body.gemini) {
+    if (body.gemini.baseUrl !== undefined) {
+      selected.gemini.baseUrl = body.gemini.baseUrl;
+    }
+    if (body.gemini.apiKey !== undefined && body.gemini.apiKey !== SECRET_MASK) {
+      selected.gemini.apiKey = body.gemini.apiKey;
+    }
+  }
   try {
     return await listModels(selected);
   } catch (error) {
-    return reply.code(400).send({ error: String(error) });
+    request.log.warn(
+      { provider: selected.provider, reason: publicError(error) },
+      "model discovery failed",
+    );
+    return reply.code(400).send({
+      error: publicError(error),
+      provider: selected.provider,
+    });
   }
 });
 
@@ -104,7 +260,8 @@ app.post("/api/ask", async (request, reply) => {
   try {
     return await ask(config, body.text, body.speak);
   } catch (error) {
-    return reply.code(400).send({ error: String(error) });
+    request.log.warn({ reason: publicError(error) }, "ask failed");
+    return reply.code(400).send({ error: publicError(error) });
   }
 });
 
@@ -124,7 +281,8 @@ app.post("/api/pair", async (request, reply) => {
       fingerprint: paired.fingerprint,
     };
   } catch (error) {
-    return reply.code(400).send({ error: String(error) });
+    request.log.warn({ reason: publicError(error) }, "pairing failed");
+    return reply.code(400).send({ error: publicError(error) });
   }
 });
 

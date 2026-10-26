@@ -1,5 +1,6 @@
 import type { Config } from "../config.js";
 import { requestJson } from "../http.js";
+import { openAiBaseUrl } from "../openai-base.js";
 import type { ChatMessage, ChatResult, ToolCall, ToolDefinition } from "./types.js";
 
 type OpenAiMessage = Record<string, unknown>;
@@ -53,7 +54,7 @@ export async function chatOpenAi(
   messages: ChatMessage[],
   tools: ToolDefinition[],
 ): Promise<ChatResult> {
-  const base = config.openai.baseUrl.trim().replace(/\/+$/, "");
+  const base = openAiBaseUrl(config);
   if (!base) throw new Error("OpenAI base URL is empty");
   if (!config.openai.model) throw new Error("OpenAI model is empty");
 

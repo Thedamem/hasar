@@ -1,5 +1,5 @@
 name: Hasar
-version: "0.1.0"
+version: "0.1.1"
 slug: hasar
 description: Hasar brain for Home Assistant and YAM stations
 url: https://github.com/Thedamem/hasar
@@ -13,10 +13,6 @@ ingress: true
 ingress_port: 8097
 panel_title: Hasar
 panel_icon: mdi:home-assistant
-ports:
-  8097/tcp: 8097
-ports_description:
-  8097/tcp: Hasar internal API
 homeassistant_api: true
 watchdog: http://[HOST]:[PORT:8097]/health
 options:
