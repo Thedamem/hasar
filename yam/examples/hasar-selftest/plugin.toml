@@ -1,0 +1,10 @@
+id = "hasar-selftest"
+name = "Hasar Self Test"
+version = "0.1.0"
+entry = "main.lua"
+description = "Проверка кольца, сегментного экрана, громкости и воспроизведения. Включите пакет и нажмите «Запустить» в вебе YAM."
+permissions = ["led", "clock", "audio"]
+
+[launch]
+kind = "lua"
+mode = "oneshot"

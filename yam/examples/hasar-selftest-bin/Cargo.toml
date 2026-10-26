@@ -1,0 +1,15 @@
+[package]
+name = "hasar-selftest-bin"
+version = "0.1.1"
+edition = "2021"
+
+[[bin]]
+name = "hasar-selftest"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

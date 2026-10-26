@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hasar</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --primary-color: #03a9f4;
+      --primary-background-color: #fafafa;
+      --card-background-color: #ffffff;
+      --primary-text-color: #212121;
+      --secondary-text-color: #727272;
+      --divider-color: #e0e0e0;
+      --error-color: #db4437;
+      --ha-card-border-radius: 12px;
+      --ha-card-box-shadow: 0 2px 4px rgba(0,0,0,.12);
+      --paper-font-body1_-_font-family: Roboto, "Segoe UI", system-ui, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --primary-background-color: #111418;
+        --card-background-color: #1c2127;
+        --primary-text-color: #e8edf2;
+        --secondary-text-color: #aab4bf;
+        --divider-color: #30363d;
+        --ha-card-box-shadow: 0 2px 6px rgba(0,0,0,.45);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--primary-background-color);
+      color: var(--primary-text-color);
+      font-family: var(--paper-font-body1_-_font-family);
+      font-size: 15px;
+      line-height: 1.45;
+    }
+    .page { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+    header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .logo {
+      width: 40px; height: 40px; border-radius: 12px;
+      background: var(--primary-color); color: white;
+      display: grid; place-items: center; font-weight: 700;
+    }
+    h1 { font-size: 24px; margin: 0; font-weight: 500; }
+    .sub { color: var(--secondary-text-color); font-size: 13px; margin: 0; }
+    .card {
+      background: var(--card-background-color);
+      border-radius: var(--ha-card-border-radius);
+      box-shadow: var(--ha-card-box-shadow);
+      padding: 18px;
+      margin-bottom: 16px;
+      border: 1px solid var(--divider-color);
+    }
+    .card h2 { font-size: 17px; margin: 0 0 14px; font-weight: 500; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .grid .full { grid-column: 1 / -1; }
+    label { display: block; font-size: 13px; color: var(--secondary-text-color); margin-bottom: 4px; }
+    input, select, textarea {
+      width: 100%; padding: 10px 12px; border-radius: 8px;
+      border: 1px solid var(--divider-color);
+      background: var(--primary-background-color);
+      color: var(--primary-text-color);
+      font: inherit;
+    }
+    textarea { min-height: 150px; resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    button {
+      border: 0; border-radius: 8px; padding: 10px 16px;
+      background: var(--primary-color); color: #fff;
+      font: inherit; cursor: pointer;
+    }
+    button.secondary { background: transparent; color: var(--primary-color); border: 1px solid var(--primary-color); }
+    button:disabled { opacity: .5; cursor: default; }
+    .hint { color: var(--secondary-text-color); font-size: 12px; margin-top: 6px; }
+    .error { color: var(--error-color); white-space: pre-wrap; font-size: 13px; margin-top: 8px; }
+    .ok { color: #2e7d32; font-size: 13px; margin-top: 8px; }
+    .hidden { display: none !important; }
+    .actions { position: sticky; bottom: 0; padding: 12px 0 0; }
+    .actions .card { margin: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="logo">H</div>
+      <div>
+        <h1>Hasar</h1>
+        <p class="sub">Мост между колонкой и Home Assistant</p>
+      </div>
+    </header>
+
+    <form id="form">
+      <section class="card">
+        <h2>Модель</h2>
+        <div class="grid">
+          <div>
+            <label for="provider">Провайдер</label>
+            <select id="provider">
+              <option value="openai">OpenAI-совместимый</option>
+              <option value="gemini">Google AI Studio</option>
+            </select>
+          </div>
+          <div class="hint">Live-режим доступен только для Google AI Studio.</div>
+        </div>
+      </section>
+
+      <section class="card" id="openai-card">
+        <h2>OpenAI-совместимый API</h2>
+        <div class="grid">
+          <div class="full">
+            <label for="openai-base">Base URL</label>
+            <input id="openai-base" placeholder="https://api.openai.com/v1">
+          </div>
+          <div class="full">
+            <label for="openai-key">API key</label>
+            <input id="openai-key" type="password" autocomplete="off">
+          </div>
+          <div class="full">
+            <label for="openai-model">Модель</label>
+            <div class="row">
+              <select id="openai-model"></select>
+              <button type="button" class="secondary" id="refresh-openai">Обновить</button>
+            </div>
+            <div class="hint">Список берётся из <code>/models</code> указанного API.</div>
+          </div>
+        </div>
+        <div class="error" id="openai-error"></div>
+      </section>
+
+      <section class="card hidden" id="gemini-card">
+        <h2>Google AI Studio</h2>
+        <div class="grid">
+          <div class="full">
+            <label for="gemini-key">API key</label>
+            <input id="gemini-key" type="password" autocomplete="off">
+          </div>
+          <div class="full">
+            <label for="gemini-chat">Chat-модель</label>
+            <select id="gemini-chat"></select>
+          </div>
+          <div class="full">
+            <label for="gemini-live">Live-модель</label>
+            <select id="gemini-live"></select>
+          </div>
+          <div class="full">
+            <label><input id="gemini-live-enabled" type="checkbox"> Использовать Gemini Live для ответов</label>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button type="button" class="secondary" id="refresh-gemini">Обновить модели</button>
+        </div>
+        <div class="hint">Live-модели определяются по поддержке <code>bidiGenerateContent</code>.</div>
+        <div class="error" id="gemini-error"></div>
+      </section>
+
+      <section class="card">
+        <h2>Маршрутизация</h2>
+        <div class="grid">
+          <div>
+            <label for="routing-mode">Режим</label>
+            <select id="routing-mode">
+              <option value="auto">Auto: Assist → LLM</option>
+              <option value="assist">Только Assist</option>
+              <option value="llm">Только LLM</option>
+            </select>
+          </div>
+          <div>
+            <label for="session-timeout">LLM-сессия, секунд</label>
+            <input id="session-timeout" type="number" min="10" max="3600">
+          </div>
+          <div class="full">
+            <label for="llm-triggers">Триггеры LLM (через запятую)</label>
+            <input id="llm-triggers">
+          </div>
+          <div class="full">
+            <label for="intent-allowlist">Разрешённые intent'ы (через запятую)</label>
+            <input id="intent-allowlist">
+          </div>
+          <div class="full">
+            <label for="system-prompt">System prompt</label>
+            <textarea id="system-prompt" style="min-height:90px"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Piper TTS</h2>
+        <div class="grid">
+          <div>
+            <label for="piper-url">Wyoming URL</label>
+            <input id="piper-url" placeholder="tcp://core-piper:10200">
+          </div>
+          <div>
+            <label for="piper-voice">Голос</label>
+            <input id="piper-voice" placeholder="ru_RU-...">
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Сеть</h2>
+        <div class="grid">
+          <div class="full">
+            <label for="socks5">SOCKS5 прокси для исходящих запросов</label>
+            <input id="socks5" placeholder="socks5://127.0.0.1:1080">
+            <div class="hint">Необязательно. Применяется к запросам моделей и MCP.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>MCP-серверы</h2>
+        <label for="mcp">JSON-массив серверов</label>
+        <textarea id="mcp" spellcheck="false"></textarea>
+        <div class="hint">Пример: <code>[{"name":"home","transport":"http","url":"http://homeassistant:8123/mcp_server/sse","enabled":true}]</code></div>
+        <div class="error" id="mcp-error"></div>
+      </section>
+
+      <section class="card">
+        <h2>Колонка</h2>
+        <div class="grid">
+          <div class="full">
+            <label for="plugin-url">URL плагина</label>
+            <input id="plugin-url" placeholder="https://<station-ip>:8443">
+          </div>
+          <div class="full">
+            <label for="plugin-token">Токен</label>
+            <input id="plugin-token" type="password" autocomplete="off">
+          </div>
+        </div>
+        <div class="hint">Обычно заполняется мастером привязки интеграции.</div>
+      </section>
+
+      <section class="card">
+        <h2>Проверка</h2>
+        <div class="grid">
+          <div class="full">
+            <label for="ask-text">Текст запроса</label>
+            <textarea id="ask-text" style="min-height:70px" placeholder="Какая погода завтра?"></textarea>
+          </div>
+          <div class="full">
+            <label><input id="ask-speak" type="checkbox" checked> Озвучить через Piper</label>
+            <button type="button" id="ask" style="margin-left:10px">Спросить</button>
+          </div>
+        </div>
+        <pre id="ask-result" class="hint" style="white-space:pre-wrap"></pre>
+      </section>
+
+      <div class="actions">
+        <div class="card">
+          <div id="status" class="hint"></div>
+          <button type="submit" id="save">Сохранить</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let config = null;
+
+    function setStatus(text, isError = false) {
+      const node = $("status");
+      node.textContent = text;
+      node.className = isError ? "error" : "hint";
+    }
+
+    function fillSelect(select, models, selected) {
+      select.innerHTML = "";
+      for (const model of models) {
+        const option = document.createElement("option");
+        option.value = model.id;
+        option.textContent = model.name === model.id ? model.id : `${model.name} (${model.id})`;
+        select.appendChild(option);
+      }
+      if (selected && models.some((model) => model.id === selected)) {
+        select.value = selected;
+      }
+      if (!models.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "— нет моделей —";
+        select.appendChild(option);
+      }
+    }
+
+    function applyProviderVisibility() {
+      const gemini = $("provider").value === "gemini";
+      $("openai-card").classList.toggle("hidden", gemini);
+      $("gemini-card").classList.toggle("hidden", !gemini);
+    }
+
+    function renderConfig(next) {
+      config = next;
+      $("provider").value = next.provider;
+      $("openai-base").value = next.openai.baseUrl;
+      $("openai-key").value = next.openai.apiKey;
+      fillSelect($("openai-model"), next.openai.model ? [{ id: next.openai.model, name: next.openai.model }] : [], next.openai.model);
+      $("gemini-key").value = next.gemini.apiKey;
+      fillSelect($("gemini-chat"), next.gemini.chatModel ? [{ id: next.gemini.chatModel, name: next.gemini.chatModel }] : [], next.gemini.chatModel);
+      fillSelect($("gemini-live"), next.gemini.liveModel ? [{ id: next.gemini.liveModel, name: next.gemini.liveModel }] : [], next.gemini.liveModel);
+      $("gemini-live-enabled").checked = next.gemini.liveEnabled;
+      $("routing-mode").value = next.routing.mode;
+      $("session-timeout").value = next.routing.sessionTimeoutSeconds;
+      $("llm-triggers").value = next.routing.llmTriggers.join(", ");
+      $("intent-allowlist").value = next.routing.intentAllowlist.join(", ");
+      $("system-prompt").value = next.systemPrompt;
+      $("piper-url").value = next.piper.url;
+      $("piper-voice").value = next.piper.voice;
+      $("socks5").value = next.proxy.socks5;
+      $("mcp").value = JSON.stringify(next.mcpServers, null, 2);
+      $("plugin-url").value = next.plugin.url;
+      $("plugin-token").value = next.plugin.token;
+      applyProviderVisibility();
+    }
+
+    function collectConfig() {
+      const mcpServers = JSON.parse($("mcp").value || "[]");
+      return {
+        ...config,
+        provider: $("provider").value,
+        openai: {
+          ...config.openai,
+          baseUrl: $("openai-base").value.trim(),
+          apiKey: $("openai-key").value,
+          model: $("openai-model").value,
+        },
+        gemini: {
+          ...config.gemini,
+          apiKey: $("gemini-key").value,
+          chatModel: $("gemini-chat").value,
+          liveModel: $("gemini-live").value,
+          liveEnabled: $("gemini-live-enabled").checked,
+        },
+        systemPrompt: $("system-prompt").value,
+        routing: {
+          ...config.routing,
+          mode: $("routing-mode").value,
+          sessionTimeoutSeconds: Number($("session-timeout").value) || 120,
+          llmTriggers: $("llm-triggers").value.split(",").map((v) => v.trim()).filter(Boolean),
+          intentAllowlist: $("intent-allowlist").value.split(",").map((v) => v.trim()).filter(Boolean),
+        },
+        piper: { url: $("piper-url").value.trim(), voice: $("piper-voice").value.trim() },
+        proxy: { socks5: $("socks5").value.trim() },
+        mcpServers,
+        plugin: { url: $("plugin-url").value.trim(), token: $("plugin-token").value },
+      };
+    }
+
+    async function request(path, options) {
+      const response = await fetch(path, options);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || response.statusText);
+      return data;
+    }
+
+    async function save() {
+      const next = collectConfig();
+      config = await request("/api/config", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(next),
+      });
+      renderConfig(config);
+      setStatus("Сохранено");
+    }
+
+    async function refresh(provider, target, liveTarget) {
+      try {
+        await save();
+        const data = await request("/api/models", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ provider }),
+        });
+        const selected = config.gemini.chatModel;
+        fillSelect($(target), data.chat, selected);
+        if (liveTarget) fillSelect($(liveTarget), data.live, config.gemini.liveModel);
+        $(provider === "gemini" ? "gemini-error" : "openai-error").textContent = "";
+        setStatus(`Модели ${provider}: ${data.chat.length} chat, ${data.live.length} live`);
+      } catch (error) {
+        $(provider === "gemini" ? "gemini-error" : "openai-error").textContent = error.message;
+      }
+    }
+
+    $("provider").addEventListener("change", applyProviderVisibility);
+    $("refresh-openai").addEventListener("click", () => refresh("openai", "openai-model"));
+    $("refresh-gemini").addEventListener("click", () => refresh("gemini", "gemini-chat", "gemini-live"));
+    $("ask").addEventListener("click", async () => {
+      const text = $("ask-text").value.trim();
+      if (!text) return;
+      $("ask-result").textContent = "Думаю…";
+      try {
+        await save();
+        const result = await request("/api/ask", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text, speak: $("ask-speak").checked }),
+        });
+        $("ask-result").textContent = JSON.stringify(result, null, 2);
+      } catch (error) {
+        $("ask-result").textContent = error.message;
+      }
+    });
+    $("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        $("mcp-error").textContent = "";
+        await save();
+      } catch (error) {
+        $("mcp-error").textContent = error.message;
+        setStatus("Ошибка сохранения", true);
+      }
+    });
+
+    request("/api/config").then(renderConfig).catch((error) => setStatus(error.message, true));
+  </script>
+</body>
+</html>

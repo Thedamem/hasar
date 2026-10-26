@@ -1,0 +1,20 @@
+recognize_intent:
+  name: Recognize intent
+  description: Match text against Home Assistant intents without executing them.
+  fields:
+    text:
+      name: Text
+      description: Text to recognize.
+      required: true
+      selector:
+        text:
+    language:
+      name: Language
+      description: Language code. Defaults to the Home Assistant language.
+      selector:
+        text:
+    device_id:
+      name: Device ID
+      description: Optional Home Assistant device context.
+      selector:
+        text:

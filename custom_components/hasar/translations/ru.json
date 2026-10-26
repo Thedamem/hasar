@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hasar",
+        "description": "Укажите адрес add-on, адрес плагина на колонке и pairing-код.",
+        "data": {
+          "addon_url": "URL add-on",
+          "plugin_url": "URL плагина",
+          "pairing_code": "Pairing-код"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Не удалось подключиться к add-on.",
+      "timeout": "Add-on не ответил вовремя.",
+      "cannot_pair": "Не удалось привязать плагин."
+    },
+    "abort": {
+      "already_configured": "Этот плагин уже привязан."
+    }
+  }
+}

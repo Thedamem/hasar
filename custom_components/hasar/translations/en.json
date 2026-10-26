@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hasar",
+        "description": "Enter the add-on URL, the station plugin URL and the pairing code.",
+        "data": {
+          "addon_url": "Add-on URL",
+          "plugin_url": "Plugin URL",
+          "pairing_code": "Pairing code"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the Hasar add-on.",
+      "timeout": "The add-on did not respond in time.",
+      "cannot_pair": "Could not pair the plugin."
+    },
+    "abort": {
+      "already_configured": "This plugin is already paired."
+    }
+  }
+}

@@ -1,0 +1,15 @@
+id = "hasar-agent"
+name = "Hasar Agent"
+version = "0.1.1"
+entry = "bin/hasar-agent"
+description = "Secure local bridge between a YAM station and Home Assistant: pairing, TLS API, audio playback, LED and clock."
+permissions = ["exec", "led", "clock"]
+
+[launch]
+kind = "binary"
+mode = "service"
+path = "bin/hasar-agent"
+
+[compatibility]
+# models intentionally omitted: any compatible AArch64 YAM device may test the package
+features = ["arch.aarch64"]

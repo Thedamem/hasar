@@ -1,0 +1,14 @@
+id = "hasar-selftest-bin"
+name = "Hasar Self Test (Binary)"
+version = "0.1.1"
+entry = "bin/hasar-selftest"
+description = "Проверка binary runtime YAM: runtime token, /device, /led, /clock и aplay. Включите пакет и нажмите «Запустить»."
+permissions = ["exec", "led", "clock"]
+
+[launch]
+kind = "binary"
+mode = "oneshot"
+path = "bin/hasar-selftest"
+
+[compatibility]
+features = ["arch.aarch64"]

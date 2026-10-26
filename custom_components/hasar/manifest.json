@@ -1,0 +1,11 @@
+{
+  "domain": "hasar",
+  "name": "Hasar",
+  "version": "0.1.0",
+  "documentation": "https://github.com/Thedamem/hasar",
+  "issue_tracker": "https://github.com/Thedamem/hasar/issues",
+  "codeowners": ["@Thedamem"],
+  "config_flow": true,
+  "iot_class": "local_push",
+  "after_dependencies": ["conversation"]
+}

@@ -1,0 +1,49 @@
+# Internal planning and research
+PLAN.md
+docs/YAM-RESEARCH.md
+docs/internal/
+
+# Local reference checkout
+ref/
+
+# Rust build output
+target/
+yam/target/
+yam/bin/
+yam/dist/
+yam/examples/*/target/
+yam/examples/*/bin/
+yam/examples/*/dist/
+
+# Add-on
+addon/node_modules/
+addon/dist/
+addon/data/
+
+# Python / Home Assistant
+__pycache__/
+*.py[cod]
+.venv/
+config/
+.storage/
+*.log
+
+# Secrets and runtime data
+.env
+.env.*
+*.pem
+*.key
+*.crt
+cert.pem
+key.pem
+fingerprint.txt
+device_id
+tokens.json
+pairing.json
+config.json
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
