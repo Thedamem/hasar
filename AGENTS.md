@@ -111,7 +111,7 @@ Gemini Live не использует Piper: PCM сразу превращает
 
 `custom_components/hasar/` — только:
 
-- config flow (URL add-on, URL плагина, pairing-код);
+- config flow (адрес add-on; IP/порт колонки и pairing-код либо подтверждение уже существующей привязки add-on);
 - config entry;
 - сервис `hasar.recognize_intent` (dry-run, без выполнения действий).
 

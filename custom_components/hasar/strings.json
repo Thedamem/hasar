@@ -2,22 +2,42 @@
   "config": {
     "step": {
       "user": {
-        "title": "Hasar",
-        "description": "Укажите адрес add-on, адрес плагина на колонке и pairing-код.",
+        "title": "Hasar: connect to the add-on",
+        "description": "**Step 1 of 2: add-on connection**\n\nHasar runs as a Home Assistant add-on. If it is not installed yet, install it from Settings → Apps → App store first.\n\nIts internal address is usually `http://local-hasar:8097`.\n\nChange it only if the add-on was renamed or runs on another host.",
         "data": {
-          "addon_url": "URL add-on",
-          "plugin_url": "URL плагина",
-          "pairing_code": "Pairing-код"
+          "addon_url": "Add-on address"
+        },
+        "data_description": {
+          "addon_url": "Usually http://local-hasar:8097. This is the add-on's internal address, not the station address."
+        }
+      },
+      "confirm": {
+        "title": "Hasar: add-on already paired",
+        "description": "The Hasar add-on is already paired with this station:\n\n**Add-on:** `{addon_url}`\n**Station:** `{plugin_url}`\n\nAdd it to Home Assistant?\n\nTo pair a different station, first change the pairing in the Hasar add-on panel."
+      },
+      "pair": {
+        "title": "Hasar: pair the station",
+        "description": "**Step 2 of 2: pairing**\n\nAdd-on: `{addon_url}`\n\n1. Make sure the `hasar-agent` plugin is installed and running on the station.\n2. Find the station IP address in your local network — for example, in your router or in YAM.\n3. Read the pairing code on the station via ADB or SSH:\n   `adb shell cat /data/quazar/yam/data/hasar-agent/pairing.json`\n4. Enter the station address and the code below.\n\nThe code is one-time. After successful pairing the file is deleted.\n\nMore details: https://github.com/Thedamem/hasar",
+        "data": {
+          "station_host": "Station IP address",
+          "plugin_port": "Plugin port",
+          "pairing_code": "Pairing code"
+        },
+        "data_description": {
+          "station_host": "For example, 192.0.2.10. You can also paste the full https://192.0.2.10:8443 address.",
+          "plugin_port": "8443 by default. Change only if the plugin listens on another port.",
+          "pairing_code": "The code from the code field in pairing.json on the station."
         }
       }
     },
     "error": {
-      "cannot_connect": "Не удалось подключиться к add-on.",
-      "timeout": "Add-on не ответил вовремя.",
-      "cannot_pair": "Не удалось привязать плагин."
+      "cannot_connect": "Could not connect to the Hasar add-on. Make sure the add-on is installed and running, and the address starts with http://.",
+      "timeout": "The add-on did not respond in time. Check that it is running.",
+      "cannot_pair": "Could not pair the station. Check the IP address, pairing code and that the plugin is running.",
+      "invalid_host": "Invalid station address. Enter an IP address or hostname, for example 192.0.2.10."
     },
     "abort": {
-      "already_configured": "Этот плагин уже привязан."
+      "already_configured": "This station is already paired."
     }
   }
 }
