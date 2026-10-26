@@ -3,12 +3,12 @@
     "step": {
       "user": {
         "title": "Hasar: connect to the add-on",
-        "description": "**Step 1 of 2: add-on connection**\n\nHasar runs as a Home Assistant add-on. If it is not installed yet, install it from Settings → Apps → App store first.\n\nIts internal address is usually `http://local-hasar:8097`.\n\nChange it only if the add-on was renamed or runs on another host.",
+        "description": "**Step 1 of 2: add-on connection**\n\nOn Home Assistant OS / Supervised the add-on address is detected automatically — the field is usually already filled, just press Submit.\n\nIf the add-on is not installed yet, install Hasar from Settings → Apps → App store.\n\nYou can enter the address manually if auto-detection did not work.",
         "data": {
           "addon_url": "Add-on address"
         },
         "data_description": {
-          "addon_url": "Usually http://local-hasar:8097. This is the add-on's internal address, not the station address."
+          "addon_url": "Usually filled automatically. This is the add-on's internal address, not the station address."
         }
       },
       "confirm": {
@@ -31,10 +31,13 @@
       }
     },
     "error": {
-      "cannot_connect": "Could not connect to the Hasar add-on. Make sure the add-on is installed and running, and the address starts with http://.",
+      "cannot_connect": "Could not connect to the Hasar add-on. Tried: {tried}. Make sure the add-on is running, or enter its hostname manually.",
       "timeout": "The add-on did not respond in time. Check that it is running.",
       "cannot_pair": "Could not pair the station. Check the IP address, pairing code and that the plugin is running.",
-      "invalid_host": "Invalid station address. Enter an IP address or hostname, for example 192.0.2.10."
+      "invalid_host": "Invalid station address. Enter an IP address or hostname, for example 192.0.2.10.",
+      "addon_missing": "The Hasar add-on was not found in Supervisor. Install Hasar from Settings → Apps → App store and try again.",
+      "addon_stopped": "The Hasar add-on was found ({hostname}), but it is not running (state: {state}). Start it and try again. Tried: {tried}.",
+      "bad_response": "The address answered, but it is not Hasar. Check the address manually. Tried: {tried}."
     },
     "abort": {
       "already_configured": "This station is already paired."

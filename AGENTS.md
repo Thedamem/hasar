@@ -111,11 +111,13 @@ Gemini Live не использует Piper: PCM сразу превращает
 
 `custom_components/hasar/` — только:
 
-- config flow (адрес add-on; IP/порт колонки и pairing-код либо подтверждение уже существующей привязки add-on);
+- config flow (автоопределение add-on через Supervisor; адрес add-on; IP/порт колонки и pairing-код либо подтверждение уже существующей привязки add-on);
 - config entry;
 - сервис `hasar.recognize_intent` (dry-run, без выполнения действий).
 
 Не переносите сюда вызовы LLM, MCP, Piper или маршрутизацию.
+
+На Home Assistant OS / Supervised config flow определяет адрес add-on через Supervisor API (`/addons`, `/addons/{slug}/info`): hostname и `ingress_port`, затем проверяет `/health` и `/api/config`. Не хардкодьте `local-hasar` как единственный адрес: у add-on из Git-репозитория hostname имеет префикс репозитория.
 
 ## Секреты add-on
 
