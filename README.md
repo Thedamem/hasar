@@ -1,4 +1,4 @@
-# Hasar
+# HAsar
 
 Локальный мост между колонкой с [YAM](https://github.com/nyakokitsu/yam) (Y Application Manager) и Home Assistant.
 
