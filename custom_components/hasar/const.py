@@ -6,7 +6,7 @@ from typing import Final
 
 DOMAIN = "hasar"
 NAME = "Hasar"
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 
 SERVICE_RECOGNIZE_INTENT = "recognize_intent"
 

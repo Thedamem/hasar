@@ -3,12 +3,12 @@
     "step": {
       "user": {
         "title": "Hasar: connect to the add-on",
-        "description": "**Step 1 of 2: add-on connection**\n\nOn Home Assistant OS / Supervised the add-on address is detected automatically — the field is usually already filled, just press Submit.\n\nIf the add-on is not installed yet, install Hasar from Settings → Apps → App store.\n\nYou can enter the address manually if auto-detection did not work.",
+        "description": "**Add-on connection**\n\nOn Home Assistant OS / Supervised the add-on is found automatically through Supervisor. If everything is fine, this step is skipped.\n\nIf the add-on cannot be found, enter its internal address manually.\n\nIf the add-on is not installed yet, install Hasar from Settings → Apps → App store.",
         "data": {
           "addon_url": "Add-on address"
         },
         "data_description": {
-          "addon_url": "Usually filled automatically. This is the add-on's internal address, not the station address."
+          "addon_url": "Filled automatically when possible. This is the add-on's internal address, not the station address."
         }
       },
       "confirm": {
@@ -17,7 +17,7 @@
       },
       "pair": {
         "title": "Hasar: pair the station",
-        "description": "**Step 2 of 2: pairing**\n\nAdd-on: `{addon_url}`\n\n1. Make sure the `hasar-agent` plugin is installed and running on the station.\n2. Find the station IP address in your local network — for example, in your router or in YAM.\n3. Read the pairing code on the station via ADB or SSH:\n   `adb shell cat /data/quazar/yam/data/hasar-agent/pairing.json`\n4. Enter the station address and the code below.\n\nThe code is one-time. After successful pairing the file is deleted.\n\nMore details: https://github.com/Thedamem/hasar",
+        "description": "**Station pairing**\n\nAdd-on: `{addon_url}`\n\n1. Make sure the `hasar-agent` plugin is installed and running on the station.\n2. Find the station IP address in your local network — for example, in your router or in YAM.\n3. Read the pairing code on the station via ADB or SSH:\n   `adb shell cat /data/quazar/yam/data/hasar-agent/pairing.json`\n4. Enter the station address and the code below.\n\nThe code is one-time. After successful pairing the file is deleted.\n\nMore details: https://github.com/Thedamem/hasar",
         "data": {
           "station_host": "Station IP address",
           "plugin_port": "Plugin port",
@@ -35,12 +35,16 @@
       "timeout": "The add-on did not respond in time. Check that it is running.",
       "cannot_pair": "Could not pair the station. Check the IP address, pairing code and that the plugin is running.",
       "invalid_host": "Invalid station address. Enter an IP address or hostname, for example 192.0.2.10.",
-      "addon_missing": "The Hasar add-on was not found in Supervisor. Install Hasar from Settings → Apps → App store and try again.",
+      "addon_missing": "The Hasar add-on was not found in Supervisor. Install Hasar from Settings → Apps → App store, or enter its address manually if it runs as a standalone container.",
       "addon_stopped": "The Hasar add-on was found ({hostname}), but it is not running (state: {state}). Start it and try again. Tried: {tried}.",
-      "bad_response": "The address answered, but it is not Hasar. Check the address manually. Tried: {tried}."
+      "bad_response": "The address answered, but it is not Hasar. Check the address manually. Tried: {tried}.",
+      "not_supervised": "Home Assistant is running without Supervisor (for example, Home Assistant Container). Automatic add-on discovery is unavailable — enter the add-on address manually, for example http://<HOST_IP>:8097.",
+      "supervisor_unavailable": "Could not read the add-on list from Supervisor. Enter the add-on address manually or check Supervisor.",
+      "cannot_connect_pairing": "Could not connect to the Hasar add-on for pairing. Make sure the add-on is running and try again."
     },
     "abort": {
-      "already_configured": "This station is already paired."
+      "already_configured": "This station is already paired.",
+      "already_in_progress": "Hasar setup is already running in another window."
     }
   }
 }

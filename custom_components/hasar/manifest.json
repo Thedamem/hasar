@@ -1,7 +1,7 @@
 {
   "domain": "hasar",
   "name": "Hasar",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "documentation": "https://github.com/Thedamem/hasar",
   "issue_tracker": "https://github.com/Thedamem/hasar/issues",
   "codeowners": ["@Thedamem"],
