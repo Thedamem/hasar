@@ -103,6 +103,30 @@ async def _supervisor_get(
     return payload if isinstance(payload, dict) else {}
 
 
+def _as_addon_list(value: Any) -> list[dict[str, Any]]:
+    """Normalize the different Supervisor add-on list shapes."""
+    if isinstance(value, list):
+        result: list[dict[str, Any]] = []
+        for item in value:
+            if isinstance(item, dict):
+                result.append(item)
+            elif isinstance(item, str):
+                result.append({"slug": item})
+        return result
+    if isinstance(value, dict):
+        nested = value.get("apps") or value.get("addons")
+        if isinstance(nested, (list, dict)) and nested is not value:
+            return _as_addon_list(nested)
+        result = []
+        for key, item in value.items():
+            if isinstance(item, dict):
+                if "slug" not in item:
+                    item = {**item, "slug": key}
+                result.append(item)
+        return result
+    return []
+
+
 def _looks_like_ours(entry: dict[str, Any]) -> bool:
     """Match the add-on by slug or display name."""
     slug = str(entry.get("slug") or "").lower()
@@ -144,19 +168,17 @@ async def async_discover_addon(hass: Any) -> dict[str, Any]:
         _LOGGER.warning("Supervisor API is unavailable: %s", err)
         return {"supervised": True, "api_error": str(err)}
 
-    data = payload.get("data") or {}
-    if isinstance(data, dict):
-        installed = data.get("apps") or data.get("addons") or []
-    elif isinstance(data, list):
-        installed = data
-    else:
-        return {"supervised": True}
-    if not isinstance(installed, list):
+    data = payload.get("data") if isinstance(payload, dict) else payload
+    installed = _as_addon_list(data)
+    if not installed and isinstance(payload, dict):
+        # Some Supervisor versions return {"apps": [...]} without a data wrapper.
+        installed = _as_addon_list(payload)
+    if not installed:
         return {"supervised": True}
 
     _LOGGER.debug(
         "Supervisor add-ons: %s",
-        [str(entry.get("slug")) for entry in installed if isinstance(entry, dict)],
+        [str(entry.get("slug")) for entry in installed],
     )
 
     for entry in installed:

@@ -35,7 +35,7 @@
       "timeout": "The add-on did not respond in time. Check that it is running.",
       "cannot_pair": "Could not pair the station. Check the IP address, pairing code and that the plugin is running.",
       "invalid_host": "Invalid station address. Enter an IP address or hostname, for example 192.0.2.10.",
-      "addon_missing": "The Hasar add-on was not found in Supervisor. Install Hasar from Settings → Apps → App store, or enter its address manually if it runs as a standalone container.",
+      "addon_missing": "The Hasar add-on is not installed in Supervisor. Adding the repository to the store is not enough: open Hasar in the store, click Install, then Start. If it runs as a standalone container, enter its address manually.",
       "addon_stopped": "The Hasar add-on was found ({hostname}), but it is not running (state: {state}). Start it and try again. Tried: {tried}.",
       "bad_response": "The address answered, but it is not Hasar. Check the address manually. Tried: {tried}.",
       "not_supervised": "Home Assistant is running without Supervisor (for example, Home Assistant Container). Automatic add-on discovery is unavailable — enter the add-on address manually, for example http://<HOST_IP>:8097.",
