@@ -117,7 +117,7 @@ Gemini Live не использует Piper: PCM сразу превращает
 
 Не переносите сюда вызовы LLM, MCP, Piper или маршрутизацию.
 
-На Home Assistant OS / Supervised config flow определяет адрес add-on через Supervisor API (`/addons`, `/addons/{slug}/info`): hostname и `ingress_port`, затем проверяет `/health` и `/api/config`. Не хардкодьте `local-hasar` как единственный адрес: у add-on из Git-репозитория hostname имеет префикс репозитория.
+На Home Assistant OS / Supervised config flow сначала читает установленные add-on из уже загруженной интеграции `hassio` (`get_addons_info`), затем при необходимости падает обратно на Supervisor API (`/addons`, `/addons/{slug}/info`): hostname и `ingress_port`, и проверяет `/health` + `/api/config`. Не хардкодьте `local-hasar` как единственный адрес: у add-on из Git-репозитория hostname имеет префикс репозитория.
 
 ## Секреты add-on
 

@@ -146,6 +146,57 @@ def _local_addon_urls(hass: Any) -> list[str]:
     return [f"http://{host}:{DEFAULT_PORT}"]
 
 
+def _build_found(
+    slug: str, hostname: str, port: int, state: str, ip_address: Any
+) -> dict[str, Any]:
+    """Build the discovery result from an add-on entry."""
+    if not hostname:
+        hostname = slug.replace("_", "-")
+    if ip_address in ("", "0.0.0.0", "::", None):
+        ip_address = None
+
+    urls: list[str] = []
+    for host in (hostname, f"{hostname}.local.hass.io", ip_address):
+        if host:
+            url = f"http://{host}:{port}"
+            if url not in urls:
+                urls.append(url)
+
+    return {
+        "supervised": True,
+        "slug": slug,
+        "hostname": hostname,
+        "state": state,
+        "urls": urls,
+    }
+
+
+def _hassio_addons(hass: Any) -> list[dict[str, Any]]:
+    """Read installed add-ons from the already-loaded hassio integration."""
+    try:
+        from homeassistant.components.hassio import get_addons_info
+    except Exception as err:  # pragma: no cover - depends on HA platform
+        _LOGGER.debug("Hassio integration is unavailable: %s", err)
+        return []
+
+    try:
+        info = get_addons_info(hass)
+    except Exception as err:  # HassioNotReadyError or missing data
+        _LOGGER.debug("Hassio add-on cache is unavailable: %s", err)
+        return []
+
+    if not isinstance(info, dict):
+        return []
+
+    result: list[dict[str, Any]] = []
+    for slug, item in info.items():
+        if isinstance(item, dict):
+            entry = dict(item)
+            entry.setdefault("slug", slug)
+            result.append(entry)
+    return result
+
+
 async def async_discover_addon(hass: Any) -> dict[str, Any]:
     """Ask Supervisor for the exact Hasar add-on hostname and port.
 
@@ -153,6 +204,22 @@ async def async_discover_addon(hass: Any) -> dict[str, Any]:
     or when the Supervisor API is unavailable, returns a marker that tells
     the flow to use the manual/fallback path.
     """
+    # Prefer the data already fetched by the hassio integration. This avoids
+    # direct Supervisor HTTP/auth issues and is the most reliable path.
+    for entry in _hassio_addons(hass):
+        if not _looks_like_ours(entry):
+            continue
+        slug = str(entry.get("slug") or "")
+        hostname = str(entry.get("hostname") or "")
+        try:
+            port = int(entry.get("ingress_port") or DEFAULT_PORT)
+        except (TypeError, ValueError):
+            port = DEFAULT_PORT
+        state = str(entry.get("state") or "")
+        found = _build_found(slug, hostname, port, state, entry.get("ip_address"))
+        _LOGGER.debug("Hassio integration: add-on %s -> %s", slug, found["urls"])
+        return found
+
     supervisor = (os.environ.get(ENV_SUPERVISOR) or "").rstrip("/")
     token = os.environ.get(ENV_SUPERVISOR_TOKEN)
     if not supervisor or not token:
@@ -198,31 +265,15 @@ async def async_discover_addon(hass: Any) -> dict[str, Any]:
             except errors as err:
                 _LOGGER.debug("Cannot read add-on info for %s: %s", slug, err)
 
-        hostname = str(info.get("hostname") or slug.replace("_", "-"))
+        hostname = str(info.get("hostname") or "")
         try:
             port = int(info.get("ingress_port") or DEFAULT_PORT)
         except (TypeError, ValueError):
             port = DEFAULT_PORT
-
-        ip_address = info.get("ip_address")
-        if ip_address in ("", "0.0.0.0", "::", None):
-            ip_address = None
-
-        urls: list[str] = []
-        for host in (hostname, f"{hostname}.local.hass.io", ip_address):
-            if host:
-                url = f"http://{host}:{port}"
-                if url not in urls:
-                    urls.append(url)
-
-        _LOGGER.debug("Supervisor: add-on %s -> %s", slug, urls)
-        return {
-            "supervised": True,
-            "slug": slug,
-            "hostname": hostname,
-            "state": str(info.get("state") or entry.get("state") or ""),
-            "urls": urls,
-        }
+        state = str(info.get("state") or entry.get("state") or "")
+        found = _build_found(slug, hostname, port, state, info.get("ip_address"))
+        _LOGGER.debug("Supervisor: add-on %s -> %s", slug, found["urls"])
+        return found
 
     return {"supervised": True}
 
