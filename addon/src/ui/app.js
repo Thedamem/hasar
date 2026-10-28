@@ -14,19 +14,21 @@ function apiUrl(path) {
 }
 
 const PAGES = {
-  overview: { title: "Обзор", subtitle: "Состояние моста Hasar" },
-  models: { title: "Модели", subtitle: "Провайдеры, ключи и выбор моделей" },
-  routing: { title: "Маршрутизация", subtitle: "Когда отвечает Assist, а когда LLM" },
-  voice: { title: "Голос", subtitle: "Piper, воспроизведение и сеть" },
-  mcp: { title: "MCP", subtitle: "Инструменты Home Assistant и внешних серверов" },
-  station: { title: "Колонка", subtitle: "Привязка YAM-плагина" }
+  overview: { title: "Обзор", subtitle: "Настройки и состояние Hasar" },
+  models: { title: "Модели", subtitle: "Провайдер и модели" },
+  routing: { title: "Маршрутизация", subtitle: "Правила обработки запросов" },
+  voice: { title: "Голос", subtitle: "Piper и воспроизведение" },
+  mcp: { title: "MCP", subtitle: "Подключённые серверы" },
+  station: { title: "Колонка", subtitle: "Привязка YAM-плагина" },
+  debug: { title: "Отладка", subtitle: "Состояние плагина и журнал запросов" },
 };
 
 const state = {
   config: null,
   dirty: false,
   health: null,
-  autoLoaded: { openai: false, gemini: false }
+  autoLoaded: { openai: false, gemini: false },
+  ledCount: 6,
 };
 
 let toastTimer = null;
@@ -35,7 +37,7 @@ function api(path, options = {}) {
   return fetch(apiUrl(path), { cache: "no-store", ...options }).then(async (response) => {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data.error || `${response.status} ${response.statusText}`);
+      throw new Error(typeof data.error === "string" ? data.error : `${response.status} ${response.statusText}`);
     }
     return data;
   });
@@ -46,25 +48,21 @@ function showToast(message, type = "ok") {
   node.textContent = message;
   node.className = `toast visible ${type}`;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    node.className = "toast";
-  }, 4200);
+  toastTimer = setTimeout(() => { node.className = "toast"; }, 3800);
 }
 
 function setDirty(value) {
   state.dirty = value;
-  const chip = $("save-state");
-  chip.textContent = value ? "Есть изменения" : "Сохранено";
-  chip.className = `chip ${value ? "chip-warn" : "chip-ok"}`;
+  $("save-state").textContent = value ? "Есть изменения" : "";
 }
 
 function checkedProvider() {
-  return document.querySelector('input[name="provider"]:checked')?.value || "openai";
+  return document.querySelector(".segmented [aria-pressed='true']")?.dataset.providerChoice || "openai";
 }
 
 function fillSelect(select, models, selected) {
   const items = Array.isArray(models) ? models : [];
-  select.innerHTML = "";
+  select.replaceChildren();
   if (selected && !items.some((model) => model.id === selected)) {
     const option = document.createElement("option");
     option.value = selected;
@@ -72,11 +70,10 @@ function fillSelect(select, models, selected) {
     select.appendChild(option);
   }
   for (const model of items) {
+    if (!model || typeof model.id !== "string") continue;
     const option = document.createElement("option");
     option.value = model.id;
-    option.textContent = model.name && model.name !== model.id
-      ? `${model.name} (${model.id})`
-      : model.id;
+    option.textContent = model.name && model.name !== model.id ? `${model.name} (${model.id})` : model.id;
     select.appendChild(option);
   }
   if (!items.length && !selected) {
@@ -85,9 +82,7 @@ function fillSelect(select, models, selected) {
     option.textContent = "— нажмите «Загрузить» —";
     select.appendChild(option);
   }
-  if (selected && [...select.options].some((option) => option.value === selected)) {
-    select.value = selected;
-  }
+  if (selected && [...select.options].some((option) => option.value === selected)) select.value = selected;
 }
 
 function currentOptions(value) {
@@ -96,63 +91,48 @@ function currentOptions(value) {
 
 function applyProvider() {
   const provider = checkedProvider();
-  for (const card of $$("[data-provider-card]")) {
-    card.classList.toggle("card-active", card.dataset.providerCard === provider);
+  for (const button of $$("[data-provider-choice]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.providerChoice === provider));
   }
-  $("openai-badge").classList.toggle("hidden", provider !== "openai");
-  $("gemini-badge").classList.toggle("hidden", provider !== "gemini");
+  for (const panel of $$("[data-provider-card]")) {
+    panel.classList.toggle("hidden", panel.dataset.providerCard !== provider);
+  }
   updateOverview();
 }
 
 function updateOverview() {
   const provider = checkedProvider();
   const model = provider === "gemini" ? $("gemini-chat").value : $("openai-model").value;
-  const live = $("gemini-live-enabled").checked;
+  const live = $("gemini-live-enabled").checked && provider === "gemini";
   const route = $("routing-mode").value;
   const pluginUrl = $("plugin-url").value.trim();
-  const fingerprint = $("plugin-fingerprint").value.trim();
-  const mcpCount = $$(".mcp-card").length;
+  const pluginToken = $("plugin-token").value.trim();
   const piperUrl = $("piper-url").value.trim();
+  const linked = Boolean(pluginUrl && pluginToken);
 
-  $("tile-provider-value").textContent = provider === "gemini" ? "Google AI Studio" : "OpenAI-совместимый";
-  $("tile-provider-sub").textContent = provider === "gemini"
-    ? (live ? "Gemini Live включён" : "Gemini Chat")
-    : "Chat Completions";
-  $("tile-model-value").textContent = model || "не выбрана";
-  $("tile-model-sub").textContent = provider === "gemini"
-    ? (live ? "Live отвечает аудио" : "Текстовый ответ")
-    : "MCP tools доступны";
-  $("tile-route-value").textContent = route === "assist" ? "Только Assist" : route === "llm" ? "Только LLM" : "Auto";
-  $("tile-route-sub").textContent = route === "auto"
-    ? "Assist → LLM"
-    : route === "assist" ? "Без fallback в LLM" : "Все запросы в модель";
-  $("tile-station-value").textContent = pluginUrl ? "Привязана" : "Не привязана";
-  $("tile-station-sub").textContent = fingerprint
-    ? fingerprint.replace(/^sha256:/, "").slice(0, 16) + "…"
-    : (pluginUrl || "нет URL плагина");
+  $("overview-provider").textContent = provider === "gemini" ? "Gemini" : "OpenAI";
+  $("overview-model").textContent = model || "не выбрана";
+  $("overview-route").textContent = route === "assist" ? "Только Assist" : route === "llm" ? "Только LLM" : "Auto";
+  $("overview-station").textContent = linked ? "Привязана" : "Не привязана";
 
-  $("state-mcp").textContent = mcpCount ? `${mcpCount} сервер(ов)` : "не настроены";
+  $("state-mcp").textContent = $$(".mcp-entry").length ? `${$$(".mcp-entry").length} сервер(ов)` : "не настроены";
   $("state-piper").textContent = piperUrl || "не настроен";
-  $("state-live").textContent = live && provider === "gemini" ? "включён" : "выключен";
-  $("state-version").textContent = state.health ? state.health.version : "—";
-  $("state-health").textContent = state.health ? "OK" : "Нет связи";
-  $("state-health").className = `chip ${state.health ? "chip-ok" : "chip-error"}`;
+  $("state-live").textContent = live ? "включён" : "выключен";
+  $("state-version").textContent = state.health?.version || "—";
+  $("state-health").textContent = state.health ? "На связи" : "Нет связи";
+  $("state-health").className = `inline-status ${state.health ? "ok-text" : "error-text"}`;
   $("piper-status").textContent = piperUrl ? "Настроен" : "Не настроен";
-  $("piper-status").className = `chip ${piperUrl ? "chip-ok" : "chip-warn"}`;
-  $("voice-plugin-status").textContent = pluginUrl && $("plugin-token").value ? "Привязана" : "Не привязана";
-  $("voice-plugin-status").className = `chip ${pluginUrl && $("plugin-token").value ? "chip-ok" : "chip-warn"}`;
-  $("voice-live-status").textContent = live && provider === "gemini"
-    ? "Live включён: аудио Gemini уходит в плагин напрямую."
-    : "Live выключен: chat-ответы озвучиваются через Piper.";
-  $("plugin-status").textContent = pluginUrl && $("plugin-token").value ? "Привязана" : "Не привязана";
-  $("plugin-status").className = `chip ${pluginUrl && $("plugin-token").value ? "chip-ok" : "chip-warn"}`;
+  $("plugin-status").textContent = linked ? "Привязана" : "Не привязана";
+  $("voice-plugin-status").textContent = linked ? "Колонка привязана" : "Колонка не привязана";
+  $("voice-live-status").textContent = live
+    ? "Ответы Gemini Live поступают в колонку напрямую."
+    : "Ответы модели озвучиваются через Piper при включённой проверке.";
 }
 
 function renderConfig(next) {
   state.config = next;
-  const provider = next.provider;
-  for (const input of $$('input[name="provider"]')) {
-    input.checked = input.value === provider;
+  for (const button of $$("[data-provider-choice]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.providerChoice === next.provider));
   }
   $("openai-base").value = next.openai.baseUrl;
   $("openai-key").value = next.openai.apiKey;
@@ -180,7 +160,7 @@ function renderConfig(next) {
 }
 
 function splitList(value) {
-  return value.split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
+  return value.split(/[\n,]/).map((item) => item.trim()).filter(Boolean);
 }
 
 function collectConfig() {
@@ -211,10 +191,7 @@ function collectConfig() {
       llmTriggers: splitList($("llm-triggers").value),
       intentAllowlist: splitList($("intent-allowlist").value),
     },
-    piper: {
-      url: $("piper-url").value.trim(),
-      voice: $("piper-voice").value.trim(),
-    },
+    piper: { url: $("piper-url").value.trim(), voice: $("piper-voice").value.trim() },
     proxy: { socks5: $("socks5").value.trim() },
     mcpServers: collectMcp(),
     plugin: {
@@ -229,13 +206,18 @@ async function save({ silent = false } = {}) {
   const button = $("save-top");
   button.disabled = true;
   try {
-    const next = collectConfig();
     const saved = await api("api/config", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(next),
+      body: JSON.stringify(collectConfig()),
     });
     state.config = saved;
+    // The API returns masks. Keep the inputs masked after a successful save.
+    $("openai-key").value = saved.openai.apiKey;
+    $("gemini-key").value = saved.gemini.apiKey;
+    $("plugin-token").value = saved.plugin.token;
+    $("socks5").value = saved.proxy.socks5;
+    renderMcp(saved.mcpServers);
     $("mcp-error").textContent = "";
     setDirty(false);
     updateOverview();
@@ -257,7 +239,6 @@ async function refreshModels(provider, { quiet = false } = {}) {
   const chatSelect = $(isGemini ? "gemini-chat" : "openai-model");
   const previous = chatSelect.value;
   const original = button.textContent;
-
   errorNode.textContent = "";
   button.disabled = true;
   button.textContent = "Загрузка…";
@@ -268,33 +249,24 @@ async function refreshModels(provider, { quiet = false } = {}) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         provider,
-        openai: {
-          baseUrl: $("openai-base").value.trim(),
-          apiKey: $("openai-key").value,
-        },
-        gemini: {
-          baseUrl: $("gemini-base").value.trim(),
-          apiKey: $("gemini-key").value,
-        },
+        openai: { baseUrl: $("openai-base").value.trim(), apiKey: $("openai-key").value },
+        gemini: { baseUrl: $("gemini-base").value.trim(), apiKey: $("gemini-key").value },
       }),
     });
+    const chatModels = Array.isArray(data.chat) ? data.chat : [];
+    const liveModels = Array.isArray(data.live) ? data.live : [];
+    fillSelect(chatSelect, chatModels, previous);
     const liveSelect = isGemini ? $("gemini-live") : null;
     const previousLive = liveSelect?.value;
-    fillSelect(chatSelect, data.chat, previous);
-    if (liveSelect) {
-      fillSelect(liveSelect, data.live, previousLive);
-    }
-    const count = isGemini
-      ? `${data.chat.length} chat · ${data.live.length} live`
-      : `${data.chat.length} моделей`;
+    if (liveSelect) fillSelect(liveSelect, liveModels, previousLive);
+    const count = isGemini ? `${chatModels.length} chat · ${liveModels.length} live` : `${chatModels.length} моделей`;
     countNode.textContent = count;
-    if (chatSelect.value !== previous || (liveSelect && liveSelect.value !== previousLive)) {
-      setDirty(true);
-    }
+    if (chatSelect.value !== previous || (liveSelect && liveSelect.value !== previousLive)) setDirty(true);
+    updateOverview();
     if (!quiet) showToast(`Модели загружены: ${count}`);
   } catch (error) {
     errorNode.textContent = error.message;
-    countNode.textContent = "ошибка загрузки";
+    countNode.textContent = "Не удалось загрузить модели.";
     if (!quiet) showToast(error.message, "error");
   } finally {
     button.disabled = false;
@@ -307,20 +279,15 @@ function maybeAutoLoadModels() {
   const provider = checkedProvider();
   if (state.autoLoaded[provider]) return;
   if (provider === "gemini" && !$("gemini-key").value) return;
-  if (provider === "openai") {
-    const base = $("openai-base").value;
-    if (!$("openai-key").value && base.includes("api.openai.com")) return;
-  }
+  if (provider === "openai" && !$("openai-key").value && $("openai-base").value.includes("api.openai.com")) return;
   state.autoLoaded[provider] = true;
   refreshModels(provider, { quiet: true });
 }
 
 function renderMcp(servers) {
   const list = $("mcp-list");
-  list.innerHTML = "";
-  for (const server of Array.isArray(servers) ? servers : []) {
-    addMcpCard(server);
-  }
+  list.replaceChildren();
+  for (const server of Array.isArray(servers) ? servers : []) addMcpCard(server);
   updateMcpState();
 }
 
@@ -329,28 +296,19 @@ function addMcpCard(server = {}) {
   const card = template.content.firstElementChild.cloneNode(true);
   const field = (name) => card.querySelector(`[data-field="${name}"]`);
   field("enabled").checked = server.enabled !== false;
-  field("name").value = server.name || `server-${$$(".mcp-card").length + 1}`;
+  field("name").value = server.name || `server-${$$(".mcp-entry").length + 1}`;
   field("transport").value = server.transport || "http";
   field("url").value = server.url || "";
   field("command").value = server.command || "";
   field("args").value = Array.isArray(server.args) ? server.args.join(", ") : "";
-  field("headers").value = Object.entries(server.headers || {})
-    .map(([key, value]) => `${key}: ${value}`)
-    .join("\n");
+  field("headers").value = Object.entries(server.headers || {}).map(([key, value]) => `${key}: ${value}`).join("\n");
 
   const sync = () => {
     const stdio = field("transport").value === "stdio";
-    for (const row of card.querySelectorAll('[data-row="url"], [data-row="headers"]')) {
-      row.classList.toggle("hidden", stdio);
-    }
-    for (const row of card.querySelectorAll('[data-row="command"], [data-row="args"]')) {
-      row.classList.toggle("hidden", !stdio);
-    }
+    for (const row of card.querySelectorAll('[data-row="url"], [data-row="headers"]')) row.classList.toggle("hidden", stdio);
+    for (const row of card.querySelectorAll('[data-row="command"], [data-row="args"]')) row.classList.toggle("hidden", !stdio);
   };
-  field("transport").addEventListener("change", () => {
-    sync();
-    setDirty(true);
-  });
+  field("transport").addEventListener("change", () => { sync(); setDirty(true); });
   card.querySelector("[data-remove]").addEventListener("click", () => {
     card.remove();
     updateMcpState();
@@ -361,7 +319,7 @@ function addMcpCard(server = {}) {
 }
 
 function updateMcpState() {
-  const count = $$(".mcp-card").length;
+  const count = $$(".mcp-entry").length;
   $("mcp-empty").classList.toggle("hidden", count > 0);
   $("mcp-count").textContent = count ? `${count} сервер(ов)` : "0 серверов";
   updateOverview();
@@ -380,7 +338,7 @@ function headersFrom(text) {
 }
 
 function collectMcp() {
-  return $$(".mcp-card").map((card) => {
+  return $$(".mcp-entry").map((card) => {
     const field = (name) => card.querySelector(`[data-field="${name}"]`);
     const name = field("name").value.trim();
     const transport = field("transport").value;
@@ -388,12 +346,8 @@ function collectMcp() {
     if (!name) throw new Error("У каждого MCP-сервера должно быть имя.");
     const url = field("url").value.trim();
     const command = field("command").value.trim();
-    if (enabled && transport !== "stdio" && !url) {
-      throw new Error(`MCP «${name}»: укажите URL.`);
-    }
-    if (enabled && transport === "stdio" && !command) {
-      throw new Error(`MCP «${name}»: укажите команду.`);
-    }
+    if (enabled && transport !== "stdio" && !url) throw new Error(`MCP «${name}»: укажите URL.`);
+    if (enabled && transport === "stdio" && !command) throw new Error(`MCP «${name}»: укажите команду.`);
     return {
       name,
       transport,
@@ -408,20 +362,19 @@ function collectMcp() {
 
 function renderAskResult(result) {
   const node = $("ask-result");
-  node.innerHTML = "";
+  node.replaceChildren();
   const meta = document.createElement("div");
   meta.className = "result-meta";
-  const routeLabels = { assist: "Assist", chat: "LLM", "gemini-live": "Gemini Live" };
-  const audioLabels = { played: "Аудио: отправлено", skipped: "Аудио: без озвучки", failed: "Аудио: ошибка" };
-  const addChip = (text, kind) => {
-    const chip = document.createElement("span");
-    chip.className = `chip ${kind}`;
-    chip.textContent = text;
-    meta.appendChild(chip);
+  const labels = { assist: "Assist", chat: "LLM", "gemini-live": "Gemini Live" };
+  const audioLabels = { played: "Аудио отправлено", skipped: "Без озвучки", failed: "Ошибка аудио" };
+  const addMeta = (text) => {
+    const item = document.createElement("span");
+    item.textContent = text;
+    meta.appendChild(item);
   };
-  addChip(`Маршрут: ${routeLabels[result.route] || result.route}`, "chip-info");
-  if (result.intent) addChip(`Intent: ${result.intent}`, "chip-ok");
-  addChip(audioLabels[result.audio] || `Аудио: ${result.audio}`, result.audio === "failed" ? "chip-error" : "chip-ok");
+  addMeta(`Маршрут: ${labels[result.route] || result.route || "—"}`);
+  if (result.intent) addMeta(`Intent: ${result.intent}`);
+  if (result.audio) addMeta(audioLabels[result.audio] || `Аудио: ${result.audio}`);
   const text = document.createElement("p");
   text.className = "result-text";
   text.textContent = result.text || "(пустой ответ)";
@@ -429,18 +382,16 @@ function renderAskResult(result) {
 }
 
 function renderError(node, message) {
-  node.innerHTML = "";
+  node.replaceChildren();
   const text = document.createElement("p");
-  text.className = "result-placeholder result-error";
+  text.className = "result-text result-error";
   text.textContent = message;
   node.appendChild(text);
 }
 
 function showPage(name, updateHash = true) {
   const page = PAGES[name] ? name : "overview";
-  for (const panel of $$("[data-page-panel]")) {
-    panel.classList.toggle("active", panel.dataset.pagePanel === page);
-  }
+  for (const panel of $$("[data-page-panel]")) panel.classList.toggle("active", panel.dataset.pagePanel === page);
   for (const button of $$(".nav-item")) {
     const active = button.dataset.page === page;
     button.classList.toggle("active", active);
@@ -452,7 +403,11 @@ function showPage(name, updateHash = true) {
   if (updateHash) history.replaceState(null, "", `#${page}`);
   closeSidebar();
   window.scrollTo(0, 0);
-  if (page === "models") setTimeout(maybeAutoLoadModels, 250);
+  if (page === "models") setTimeout(maybeAutoLoadModels, 180);
+  if (page === "debug") {
+    loadPluginStatus();
+    loadDebugLog();
+  }
 }
 
 function closeSidebar() {
@@ -463,7 +418,7 @@ async function loadHealth() {
   try {
     state.health = await api("health");
     $("conn-dot").className = "dot ok";
-    $("conn-text").textContent = `Add-on ${state.health.version}`;
+    $("conn-text").textContent = `Add-on ${state.health.version || "на связи"}`;
   } catch {
     state.health = null;
     $("conn-dot").className = "dot error";
@@ -476,21 +431,254 @@ async function loadConfig() {
   try {
     renderConfig(await api("api/config"));
   } catch (error) {
-    $("save-state").textContent = "Ошибка";
-    $("save-state").className = "chip chip-error";
+    $("save-state").textContent = "Ошибка загрузки";
     showToast(error.message, "error");
   }
 }
 
-for (const button of $$(".nav-item")) {
-  button.addEventListener("click", () => showPage(button.dataset.page));
+function textValue(value, fallback = "—") {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (typeof value === "boolean") return value ? "Да" : "Нет";
+  if (Array.isArray(value)) return value.map((item) => textValue(item, "")).filter(Boolean).join(", ") || fallback;
+  if (typeof value === "object") return "Данные доступны";
+  return String(value);
 }
-for (const button of $$("[data-goto]")) {
+
+function renderPluginStatus(data) {
+  const info = data?.info && typeof data.info === "object" ? data.info : {};
+  const pluginState = data?.state && typeof data.state === "object" ? data.state : {};
+  const model = info.model ?? info.modelName ?? pluginState.model ?? pluginState.modelName;
+  const features = info.features ?? pluginState.features;
+  const count = Number(data?.ledCount ?? info.ledCount ?? state.ledCount);
+  state.ledCount = Number.isFinite(count) ? Math.max(1, Math.min(24, Math.floor(count))) : 6;
+  const pairingOpen = pluginState.pairing_open ?? info.pairing_open;
+  const playback = pluginState.playback;
+  const playing = playback && typeof playback === "object" ? playback.playing : undefined;
+  const entries = [
+    ["Модель", textValue(model)],
+    ["Features", Array.isArray(features)
+      ? textValue(features)
+      : features && typeof features === "object"
+        ? Object.entries(features).map(([name, enabled]) => `${name}: ${textValue(enabled)}`).join(", ") || "—"
+        : textValue(features)],
+    ["LED", String(state.ledCount)],
+    ["Код pairing", pairingOpen === true ? "Открыт" : pairingOpen === false ? "Закрыт" : "—"],
+    ["Воспроизведение", playing === true ? "Играет" : playing === false ? "Остановлено" : "—"],
+  ];
+  const list = $("debug-plugin-status");
+  list.replaceChildren();
+  for (const [label, value] of entries) {
+    const row = document.createElement("div");
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+    term.textContent = label;
+    description.textContent = value;
+    row.append(term, description);
+    list.appendChild(row);
+  }
+  renderLedColors(state.ledCount);
+}
+
+async function loadPluginStatus() {
+  const errorNode = $("debug-plugin-error");
+  errorNode.textContent = "";
+  try {
+    renderPluginStatus(await api("api/debug/plugin"));
+  } catch (error) {
+    errorNode.textContent = error.message;
+    const list = $("debug-plugin-status");
+    list.replaceChildren();
+    const row = document.createElement("div");
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+    term.textContent = "Состояние";
+    description.textContent = "Не удалось получить данные";
+    row.append(term, description);
+    list.appendChild(row);
+  }
+}
+
+function renderLedColors(count) {
+  const host = $("led-colors");
+  const previous = $$("input[type='color']", host).map((input) => input.value);
+  host.replaceChildren();
+  host.className = "full color-list";
+  for (let index = 0; index < count; index += 1) {
+    const label = document.createElement("label");
+    label.className = "color-field";
+    label.textContent = `LED ${index + 1}`;
+    const input = document.createElement("input");
+    input.type = "color";
+    input.value = previous[index] || "#087bb8";
+    input.setAttribute("aria-label", `Цвет LED ${index + 1}`);
+    label.appendChild(input);
+    host.appendChild(label);
+  }
+  syncLedPreset();
+}
+
+function syncLedPreset() {
+  const off = $("led-preset").value === "off";
+  $("led-colors").classList.toggle("hidden", off);
+}
+
+function setInlineStatus(id, message, kind = "") {
+  const node = $(id);
+  node.textContent = message;
+  node.className = `inline-status${kind ? ` ${kind}-text` : ""}`;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function scaleColor(hex, factor) {
+  const value = hex.replace("#", "");
+  const channels = [0, 2, 4].map((index) => {
+    const channel = Number.parseInt(value.slice(index, index + 2), 16);
+    return Math.max(0, Math.min(255, Math.round(channel * factor)));
+  });
+  return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+}
+
+async function postLed(colors) {
+  await api("api/debug/led", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ colors }),
+  });
+}
+
+async function sendLed() {
+  const button = $("led-send");
+  const preset = $("led-preset").value;
+  button.disabled = true;
+  setInlineStatus("led-result", "Отправка…");
+  try {
+    if (preset === "off") {
+      await api("api/debug/led/off", { method: "POST" });
+    } else {
+      const colors = $$("input[type='color']", $("led-colors")).map((input) => input.value.toUpperCase());
+      if (preset === "pulse") {
+        const base = colors[0] || "#087BB8";
+        for (const factor of [1, 0.55, 0.2, 0.55, 1]) {
+          await postLed(Array(state.ledCount).fill(scaleColor(base, factor)));
+          await sleep(140);
+        }
+      } else if (preset === "rainbow") {
+        const palette = ["#FF0000", "#FF7F00", "#FFFF00", "#00C853", "#00B0FF", "#651FFF", "#D500F9"];
+        for (let step = 0; step < 7; step += 1) {
+          await postLed(Array.from({ length: state.ledCount }, (_, index) => palette[(index + step) % palette.length]));
+          await sleep(140);
+        }
+      } else {
+        await postLed(colors);
+      }
+    }
+    setInlineStatus("led-result", "Отправлено", "ok");
+  } catch (error) {
+    setInlineStatus("led-result", error.message, "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function sendClock(off = false) {
+  const button = off ? $("clock-off") : $("clock-send");
+  button.disabled = true;
+  setInlineStatus("clock-result", "Отправка…");
+  try {
+    const body = off
+      ? { off: true }
+      : { time: $("clock-time").value, brightness: Number($("clock-brightness").value) };
+    if (!off && !/^\d{2}:\d{2}$/.test(body.time)) throw new Error("Укажите время.");
+    await api("api/debug/clock", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    setInlineStatus("clock-result", off ? "Часы выключены" : "Отправлено", "ok");
+  } catch (error) {
+    setInlineStatus("clock-result", error.message, "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function eventTime(event) {
+  const value = event.time ?? event.timestamp ?? event.createdAt ?? event.at;
+  if (typeof value === "number") return new Date(value).toLocaleString();
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? value : new Date(parsed).toLocaleString();
+  }
+  return "Время неизвестно";
+}
+
+function renderDebugLog(events) {
+  const host = $("log-list");
+  host.replaceChildren();
+  const rows = Array.isArray(events) ? events : [];
+  $("log-empty").classList.toggle("hidden", rows.length > 0);
+  for (const event of rows) {
+    const article = document.createElement("article");
+    article.className = "log-event";
+    const head = document.createElement("div");
+    head.className = "log-event-head";
+    const time = document.createElement("span");
+    time.textContent = eventTime(event || {});
+    const source = document.createElement("strong");
+    source.textContent = textValue(event?.source, "Источник неизвестен");
+    head.append(time, source);
+    article.appendChild(head);
+
+    const textValueNode = document.createElement("p");
+    textValueNode.className = "log-event-text";
+    textValueNode.textContent = textValue(event?.text, "(без текста)");
+    article.appendChild(textValueNode);
+
+    const metadata = document.createElement("div");
+    metadata.className = "log-event-meta";
+    const fields = [
+      ["Маршрут", event?.route],
+      ["Модель", event?.model],
+      ["Время ответа", event?.durationMs === null || event?.durationMs === undefined ? null : `${event.durationMs} мс`],
+    ];
+    for (const [label, value] of fields) {
+      if (value === null || value === undefined || value === "") continue;
+      const item = document.createElement("span");
+      item.textContent = `${label}: ${textValue(value)}`;
+      metadata.appendChild(item);
+    }
+    if (metadata.childNodes.length) article.appendChild(metadata);
+    if (event?.error) {
+      const error = document.createElement("div");
+      error.className = "log-event-error";
+      error.textContent = `Ошибка: ${textValue(event.error)}`;
+      article.appendChild(error);
+    }
+    host.appendChild(article);
+  }
+}
+
+async function loadDebugLog() {
+  const errorNode = $("debug-log-error");
+  errorNode.textContent = "";
+  try {
+    const data = await api("api/debug/log");
+    renderDebugLog(data?.events);
+  } catch (error) {
+    errorNode.textContent = error.message;
+    renderDebugLog([]);
+    $("log-empty").classList.add("hidden");
+  }
+}
+
+for (const button of $$(".nav-item")) button.addEventListener("click", () => showPage(button.dataset.page));
+for (const button of $$('[data-goto]')) {
   button.addEventListener("click", () => {
     showPage(button.dataset.goto);
-    if (button.dataset.focus) {
-      setTimeout(() => $(button.dataset.focus).focus(), 80);
-    }
+    if (button.dataset.focus) setTimeout(() => $(button.dataset.focus).focus(), 80);
   });
 }
 
@@ -498,15 +686,17 @@ $("menu").addEventListener("click", () => document.body.classList.add("sidebar-o
 $("scrim").addEventListener("click", closeSidebar);
 window.addEventListener("hashchange", () => showPage(location.hash.slice(1) || "overview", false));
 
-for (const input of $$('input[name="provider"]')) {
-  input.addEventListener("change", () => {
+for (const button of $$("[data-provider-choice]")) {
+  button.addEventListener("click", () => {
+    if (button.dataset.providerChoice === checkedProvider()) return;
+    for (const choice of $$("[data-provider-choice]")) choice.setAttribute("aria-pressed", String(choice === button));
     applyProvider();
     setDirty(true);
     maybeAutoLoadModels();
   });
 }
 
-for (const button of $$("[data-reveal]")) {
+for (const button of $$('[data-reveal]')) {
   button.addEventListener("click", () => {
     const input = $(button.dataset.reveal);
     const show = input.type === "password";
@@ -515,9 +705,7 @@ for (const button of $$("[data-reveal]")) {
   });
 }
 
-$("save-top").addEventListener("click", () => {
-  save().catch(() => undefined);
-});
+$("save-top").addEventListener("click", () => save().catch(() => undefined));
 $("refresh-openai").addEventListener("click", () => refreshModels("openai"));
 $("refresh-gemini").addEventListener("click", () => refreshModels("gemini"));
 $("mcp-add").addEventListener("click", () => {
@@ -535,13 +723,13 @@ $("ask").addEventListener("click", async () => {
   }
   const button = $("ask");
   button.disabled = true;
-  renderError($("ask-result"), "Думаю…");
+  renderError($("ask-result"), "Выполняю запрос…");
   try {
     await save({ silent: true });
     const result = await api("api/ask", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, speak: $("ask-speak").checked }),
+      body: JSON.stringify({ text, speak: $("ask-speak").checked, source: "debug" }),
     });
     renderAskResult(result);
     setDirty(false);
@@ -562,7 +750,7 @@ $("pair").addEventListener("click", async () => {
   }
   const button = $("pair");
   button.disabled = true;
-  renderError($("pair-result"), "Привязываю…");
+  renderError($("pair-result"), "Выполняется привязка…");
   try {
     const result = await api("api/pair", {
       method: "POST",
@@ -576,10 +764,10 @@ $("pair").addEventListener("click", async () => {
     $("plugin-fingerprint").value = next.plugin.fingerprint || "—";
     $("pair-url").value = next.plugin.url;
     $("pair-code").value = "";
-    $("pair-result").innerHTML = "";
+    $("pair-result").replaceChildren();
     const message = document.createElement("p");
     message.className = "result-text";
-    message.textContent = `Готово. Device ID: ${result.device_id}`;
+    message.textContent = `Готово. Device ID: ${textValue(result.device_id, "—")}`;
     $("pair-result").appendChild(message);
     updateOverview();
     showToast("Колонка привязана");
@@ -591,18 +779,30 @@ $("pair").addEventListener("click", async () => {
   }
 });
 
-$("form").addEventListener("input", () => {
-  setDirty(true);
-  updateOverview();
+$("plugin-refresh").addEventListener("click", loadPluginStatus);
+$("log-refresh").addEventListener("click", loadDebugLog);
+$("led-preset").addEventListener("change", syncLedPreset);
+$("led-send").addEventListener("click", sendLed);
+$("clock-send").addEventListener("click", () => sendClock(false));
+$("clock-off").addEventListener("click", () => sendClock(true));
+$("clock-brightness").addEventListener("input", () => { $("clock-brightness-value").textContent = $("clock-brightness").value; });
+$("cancel-playback").addEventListener("click", async () => {
+  const button = $("cancel-playback");
+  button.disabled = true;
+  setInlineStatus("cancel-result", "Отправка…");
+  try {
+    await api("api/debug/cancel", { method: "POST" });
+    setInlineStatus("cancel-result", "Отправлено", "ok");
+  } catch (error) {
+    setInlineStatus("cancel-result", error.message, "error");
+  } finally {
+    button.disabled = false;
+  }
 });
-$("form").addEventListener("change", () => {
-  setDirty(true);
-  updateOverview();
-});
-$("form").addEventListener("submit", (event) => {
-  event.preventDefault();
-  save().catch(() => undefined);
-});
+
+$("form").addEventListener("input", () => { setDirty(true); updateOverview(); });
+$("form").addEventListener("change", () => { setDirty(true); updateOverview(); });
+$("form").addEventListener("submit", (event) => { event.preventDefault(); save().catch(() => undefined); });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeSidebar();
@@ -619,14 +819,11 @@ window.addEventListener("beforeunload", (event) => {
 });
 
 const initialPage = location.hash.slice(1);
+renderLedColors(state.ledCount);
 showPage(PAGES[initialPage] ? initialPage : "overview", false);
 loadConfig().then(() => {
-  if (PAGES[initialPage] && initialPage !== "overview") {
-    setTimeout(() => showPage(initialPage, false), 0);
-  }
-  if (initialPage === "models") {
-    setTimeout(maybeAutoLoadModels, 300);
-  }
+  if (PAGES[initialPage] && initialPage !== "overview") setTimeout(() => showPage(initialPage, false), 0);
+  if (initialPage === "models") setTimeout(maybeAutoLoadModels, 250);
 });
 loadHealth();
 setInterval(loadHealth, 30_000);

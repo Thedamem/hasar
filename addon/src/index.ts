@@ -10,9 +10,18 @@ import {
   saveConfig,
   type Config,
 } from "./config.js";
+import { recentAsks } from "./debug.js";
 import { listModels } from "./models.js";
 import { pairPlugin } from "./pairing.js";
 import { ask } from "./pipeline.js";
+import {
+  pluginCancel,
+  pluginClock,
+  pluginInfo,
+  pluginLed,
+  pluginLedOff,
+  pluginState,
+} from "./plugin.js";
 
 const dataDir = process.env.HASAR_DATA_DIR ?? "/data";
 let logLevel = process.env.LOG_LEVEL ?? "info";
@@ -147,7 +156,7 @@ app.setErrorHandler((error, request, reply) => {
   return reply.code(status).send({ error: publicError(error) });
 });
 
-app.get("/health", async () => ({ status: "ok", version: "0.1.1" }));
+app.get("/health", async () => ({ status: "ok", version: "0.2.0" }));
 
 app.get("/", async (_request, reply) => {
   return reply.type("text/html; charset=utf-8").send(ui);
@@ -255,15 +264,98 @@ app.get("/api/status", async () => ({
 
 app.post("/api/ask", async (request, reply) => {
   const body = z
-    .object({ text: z.string().min(1), speak: z.boolean().default(true) })
+    .object({
+      text: z.string().min(1),
+      speak: z.boolean().default(true),
+      source: z.enum(["station", "debug", "api"]).default("api"),
+    })
     .parse(request.body);
   try {
-    return await ask(config, body.text, body.speak);
+    return await ask(config, body.text, body.speak, body.source);
   } catch (error) {
     request.log.warn({ reason: publicError(error) }, "ask failed");
     return reply.code(400).send({ error: publicError(error) });
   }
 });
+
+function ledCountFromInfo(info: Record<string, unknown> | undefined): number {
+  const features = Array.isArray(info?.features) ? info.features : [];
+  for (const feature of features) {
+    if (typeof feature !== "string") continue;
+    const match = /^led\.ring\.(\d+)$/.exec(feature);
+    if (match) return Number(match[1]);
+  }
+  return 6;
+}
+
+app.get("/api/debug/plugin", async (request, reply) => {
+  try {
+    const [info, state] = await Promise.all([
+      pluginInfo(config),
+      pluginState(config),
+    ]);
+    return {
+      info: info ?? null,
+      state: state ?? null,
+      ledCount: ledCountFromInfo(info),
+    };
+  } catch (error) {
+    request.log.warn({ reason: publicError(error) }, "plugin status failed");
+    return reply.code(400).send({ error: publicError(error) });
+  }
+});
+
+app.post("/api/debug/led", async (request, reply) => {
+  const body = z
+    .object({ colors: z.array(z.string().min(1)).min(1).max(64) })
+    .parse(request.body);
+  try {
+    await pluginLed(config, body.colors);
+    return { ok: true };
+  } catch (error) {
+    request.log.warn({ reason: publicError(error) }, "plugin led failed");
+    return reply.code(400).send({ error: publicError(error) });
+  }
+});
+
+app.post("/api/debug/led/off", async (request, reply) => {
+  try {
+    await pluginLedOff(config);
+    return { ok: true };
+  } catch (error) {
+    request.log.warn({ reason: publicError(error) }, "plugin led off failed");
+    return reply.code(400).send({ error: publicError(error) });
+  }
+});
+
+app.post("/api/debug/clock", async (request, reply) => {
+  const body = z
+    .object({
+      time: z.string().optional(),
+      brightness: z.number().int().min(0).max(255).optional(),
+      off: z.boolean().optional(),
+    })
+    .parse(request.body);
+  try {
+    await pluginClock(config, body);
+    return { ok: true };
+  } catch (error) {
+    request.log.warn({ reason: publicError(error) }, "plugin clock failed");
+    return reply.code(400).send({ error: publicError(error) });
+  }
+});
+
+app.post("/api/debug/cancel", async (request, reply) => {
+  try {
+    await pluginCancel(config);
+    return { ok: true };
+  } catch (error) {
+    request.log.warn({ reason: publicError(error) }, "plugin cancel failed");
+    return reply.code(400).send({ error: publicError(error) });
+  }
+});
+
+app.get("/api/debug/log", async () => ({ events: recentAsks() }));
 
 app.post("/api/pair", async (request, reply) => {
   const body = z

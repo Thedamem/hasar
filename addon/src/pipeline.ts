@@ -1,5 +1,6 @@
 import type { Config } from "./config.js";
 import { wavFromPcm } from "./audio.js";
+import { recordAsk, type AskSource } from "./debug.js";
 import { callHaService, textFromAssistResponse } from "./ha.js";
 import { chatGemini } from "./llm/gemini.js";
 import { geminiLive } from "./llm/gemini-live.js";
@@ -177,10 +178,51 @@ export async function ask(
   config: Config,
   text: string,
   speakText: boolean,
+  source: AskSource = "api",
 ): Promise<AskResult> {
   const trimmed = text.trim();
   if (!trimmed) throw new Error("text is empty");
 
+  const started = Date.now();
+  const provider = config.provider;
+  const model =
+    provider === "gemini"
+      ? config.gemini.liveEnabled
+        ? config.gemini.liveModel
+        : config.gemini.chatModel
+      : config.openai.model;
+
+  try {
+    const result = await askInner(config, trimmed, speakText);
+    recordAsk({
+      source,
+      text: trimmed,
+      route: result.route,
+      intent: result.intent,
+      provider,
+      model,
+      durationMs: Date.now() - started,
+      audio: result.audio,
+    });
+    return result;
+  } catch (error) {
+    recordAsk({
+      source,
+      text: trimmed,
+      provider,
+      model,
+      durationMs: Date.now() - started,
+      error: String(error),
+    });
+    throw error;
+  }
+}
+
+async function askInner(
+  config: Config,
+  trimmed: string,
+  speakText: boolean,
+): Promise<AskResult> {
   const explicitLlm = hasTrigger(trimmed, config.routing.llmTriggers);
   if (config.routing.mode === "llm" || explicitLlm) {
     return runLlm(config, trimmed, speakText);
