@@ -119,6 +119,15 @@ Gemini Live не использует Piper: PCM сразу превращает
 
 На Home Assistant OS / Supervised config flow сначала читает установленные add-on из уже загруженной интеграции `hassio` (`get_addons_info`), затем при необходимости падает обратно на Supervisor API (`/addons`, `/addons/{slug}/info`): hostname и `ingress_port`, и проверяет `/health` + `/api/config`. Не хардкодьте `local-hasar` как единственный адрес: у add-on из Git-репозитория hostname имеет префикс репозитория.
 
+## YAM v2
+
+YAM v2 (`main`, `.yampkg`, `yam.yaml`, platform profiles) — package manager без
+супервизора служб. Пакет может объявить `services`, но YAM v2 их не запускает;
+Luna пока использует старые `.yap`/`plugin.toml`. Не мигрируйте `hasar-agent`
+на `.yampkg`, пока не появится host/supervisor для служб: иначе пакет будет
+устанавливаться, но не работать. Локальные reference-клоны: `ref/yam`,
+`ref/luna` (gitignored).
+
 ## Секреты add-on
 
 - `addon/src/secrets.ts` — AES-256-GCM.
