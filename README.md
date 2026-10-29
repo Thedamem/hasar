@@ -130,11 +130,12 @@ UI открывается из панели add-on в Home Assistant (ingress). 
 
 - OpenAI-совместимый Chat Completions и модель (список из `/models`);
 - Google AI Studio: base URL, chat-модель, live-модель (`bidiGenerateContent`) и режим live;
+- общий system prompt для chat- и Live-ответов;
 - Piper: Wyoming URL и голос;
 - SOCKS5-прокси для запросов моделей;
 - MCP-серверы (HTTP/SSE/stdio);
-- routing: Assist / LLM / auto;
-- URL и токен плагина.
+- routing: Assist / LLM / auto и allowlist intent'ов;
+- привязка колонки: URL плагина, pairing-код, токен и fingerprint.
 
 Add-on умеет:
 
@@ -143,7 +144,7 @@ Add-on умеет:
 - вызывать Gemini Live с текстовым входом и аудиовыходом;
 - синтезировать ответ через Piper (Wyoming) и отправлять WAV в плагин;
 - проверять intent через `hasar.recognize_intent` и отдавать простые команды Assist;
-- тестировать ответ через `/api/ask` и вкладку «Отладка»: LED-анимации, часы, остановка playback, статус плагина и журнал запросов.
+- тестировать ответ через `/api/ask` и быстрый тест в «Обзоре»; смотреть статус плагина, LED, часы, остановку playback и журнал запросов в «Отладке».
 
 Piper — отдельный add-on. Внутри Supervisor он доступен как `core-piper:10200`.
 

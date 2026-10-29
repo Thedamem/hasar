@@ -15,13 +15,15 @@ function apiUrl(path) {
 
 const PAGES = {
   overview: { title: "Обзор", subtitle: "Настройки и состояние Hasar" },
-  models: { title: "Модели", subtitle: "Провайдер и модели" },
+  models: { title: "Модели", subtitle: "Провайдер, модели и поведение" },
   routing: { title: "Маршрутизация", subtitle: "Правила обработки запросов" },
-  voice: { title: "Голос", subtitle: "Piper и воспроизведение" },
   mcp: { title: "MCP", subtitle: "Подключённые серверы" },
-  station: { title: "Колонка", subtitle: "Привязка YAM-плагина" },
+  station: { title: "Колонка", subtitle: "Привязка и озвучивание" },
   debug: { title: "Отладка", subtitle: "Состояние плагина и журнал запросов" },
 };
+
+const ROUTE_LABELS = { assist: "Assist", chat: "LLM", "gemini-live": "Gemini Live" };
+const SOURCE_LABELS = { station: "Колонка", debug: "Быстрый тест", api: "API" };
 
 const state = {
   config: null,
@@ -32,6 +34,7 @@ const state = {
 };
 
 let toastTimer = null;
+let saveStateTimer = null;
 
 function api(path, options = {}) {
   return fetch(apiUrl(path), { cache: "no-store", ...options }).then(async (response) => {
@@ -53,11 +56,39 @@ function showToast(message, type = "ok") {
 
 function setDirty(value) {
   state.dirty = value;
-  $("save-state").textContent = value ? "Есть изменения" : "";
+  const button = $("save-top");
+  const status = $("save-state");
+  button.disabled = !value;
+  button.title = value ? "" : "Нет изменений";
+  clearTimeout(saveStateTimer);
+  if (value) {
+    status.textContent = "Не сохранено";
+    status.className = "save-state dirty";
+  } else {
+    status.textContent = "";
+    status.className = "save-state";
+  }
+}
+
+function markSaved() {
+  const status = $("save-state");
+  clearTimeout(saveStateTimer);
+  status.textContent = "Сохранено";
+  status.className = "save-state saved";
+  saveStateTimer = setTimeout(() => {
+    if (!state.dirty) {
+      status.textContent = "";
+      status.className = "save-state";
+    }
+  }, 2400);
 }
 
 function checkedProvider() {
   return document.querySelector(".segmented [aria-pressed='true']")?.dataset.providerChoice || "openai";
+}
+
+function routingMode() {
+  return document.querySelector('input[name="routing-mode"]:checked')?.value || "auto";
 }
 
 function fillSelect(select, models, selected) {
@@ -104,7 +135,7 @@ function updateOverview() {
   const provider = checkedProvider();
   const model = provider === "gemini" ? $("gemini-chat").value : $("openai-model").value;
   const live = $("gemini-live-enabled").checked && provider === "gemini";
-  const route = $("routing-mode").value;
+  const route = routingMode();
   const pluginUrl = $("plugin-url").value.trim();
   const pluginToken = $("plugin-token").value.trim();
   const piperUrl = $("piper-url").value.trim();
@@ -118,15 +149,14 @@ function updateOverview() {
   $("state-mcp").textContent = $$(".mcp-entry").length ? serverCountLabel($$(".mcp-entry").length) : "не настроены";
   $("state-piper").textContent = piperUrl || "не настроен";
   $("state-live").textContent = live ? "включён" : "выключен";
-  $("state-version").textContent = state.health?.version || "—";
-  $("state-health").textContent = state.health ? "На связи" : "Нет связи";
-  $("state-health").className = `inline-status ${state.health ? "ok-text" : "error-text"}`;
   $("piper-status").textContent = piperUrl ? "Настроен" : "Не настроен";
   $("plugin-status").textContent = linked ? "Привязана" : "Не привязана";
   $("voice-plugin-status").textContent = linked ? "Колонка привязана" : "Колонка не привязана";
   $("voice-live-status").textContent = live
     ? "Ответы Gemini Live поступают в колонку напрямую."
     : "Ответы модели озвучиваются через Piper при включённой проверке.";
+
+  $("pair-details").querySelector("summary").textContent = linked ? "Привязать заново" : "Привязка колонки";
 }
 
 function renderConfig(next) {
@@ -142,7 +172,8 @@ function renderConfig(next) {
   fillSelect($("gemini-chat"), currentOptions(next.gemini.chatModel), next.gemini.chatModel);
   fillSelect($("gemini-live"), currentOptions(next.gemini.liveModel), next.gemini.liveModel);
   $("gemini-live-enabled").checked = next.gemini.liveEnabled;
-  $("routing-mode").value = next.routing.mode;
+  const routeInput = document.querySelector(`input[name="routing-mode"][value="${next.routing.mode}"]`);
+  if (routeInput) routeInput.checked = true;
   $("session-timeout").value = next.routing.sessionTimeoutSeconds;
   $("llm-triggers").value = next.routing.llmTriggers.join(", ");
   $("intent-allowlist").value = next.routing.intentAllowlist.join(", ");
@@ -154,6 +185,7 @@ function renderConfig(next) {
   $("plugin-token").value = next.plugin.token;
   $("plugin-fingerprint").value = next.plugin.fingerprint || "—";
   $("pair-url").value = next.plugin.url;
+  $("pair-details").open = !(next.plugin.url && next.plugin.token);
   renderMcp(next.mcpServers);
   applyProvider();
   setDirty(false);
@@ -202,7 +234,7 @@ function collectConfig() {
     systemPrompt: $("system-prompt").value,
     routing: {
       ...state.config.routing,
-      mode: $("routing-mode").value,
+      mode: routingMode(),
       sessionTimeoutSeconds: Number($("session-timeout").value) || 120,
       llmTriggers: splitList($("llm-triggers").value),
       intentAllowlist: splitList($("intent-allowlist").value),
@@ -238,14 +270,14 @@ async function save({ silent = false } = {}) {
     renderMcp(saved.mcpServers);
     $("mcp-error").textContent = "";
     setDirty(false);
+    markSaved();
     updateOverview();
-    if (!silent) showToast("Настройки сохранены");
     return saved;
   } catch (error) {
     if (!silent) showToast(error.message, "error");
     throw error;
   } finally {
-    button.disabled = false;
+    button.disabled = !state.dirty;
     button.textContent = label;
   }
 }
@@ -282,7 +314,6 @@ async function refreshModels(provider, { quiet = false } = {}) {
     countNode.textContent = count;
     if (chatSelect.value !== previous || (liveSelect && liveSelect.value !== previousLive)) setDirty(true);
     updateOverview();
-    if (!quiet) showToast(`Модели загружены: ${count}`);
   } catch (error) {
     errorNode.textContent = error.message;
     countNode.textContent = "Не удалось загрузить модели.";
@@ -384,7 +415,6 @@ function renderAskResult(result) {
   node.replaceChildren();
   const meta = document.createElement("div");
   meta.className = "result-meta";
-  const labels = { assist: "Assist", chat: "LLM", "gemini-live": "Gemini Live" };
   const audioLabels = { played: "Аудио отправлено", skipped: "Без озвучки", failed: "Ошибка аудио" };
   const addMeta = (text, className = "") => {
     const item = document.createElement("span");
@@ -392,7 +422,7 @@ function renderAskResult(result) {
     if (className) item.className = className;
     meta.appendChild(item);
   };
-  addMeta(`Маршрут: ${labels[result.route] || result.route || "—"}`);
+  addMeta(`Маршрут: ${ROUTE_LABELS[result.route] || result.route || "—"}`);
   if (result.intent) addMeta(`Intent: ${result.intent}`);
   if (result.audio) addMeta(audioLabels[result.audio] || `Аудио: ${result.audio}`, result.audio === "failed" ? "result-meta-error" : "");
   const text = document.createElement("p");
@@ -410,7 +440,7 @@ function renderError(node, message) {
 }
 
 function showPage(name, updateHash = true) {
-  const page = PAGES[name] ? name : "overview";
+  const page = name === "voice" ? "station" : PAGES[name] ? name : "overview";
   for (const panel of $$("[data-page-panel]")) panel.classList.toggle("active", panel.dataset.pagePanel === page);
   for (const button of $$(".nav-item")) {
     const active = button.dataset.page === page;
@@ -445,7 +475,7 @@ async function loadHealth() {
   } catch {
     state.health = null;
     $("conn-dot").className = "dot error";
-    $("conn-text").textContent = "Нет связи с add-on";
+    $("conn-text").textContent = "Нет связи";
   }
   updateOverview();
 }
@@ -455,6 +485,7 @@ async function loadConfig() {
     renderConfig(await api("api/config"));
   } catch (error) {
     $("save-state").textContent = "Ошибка загрузки";
+    $("save-state").className = "save-state error";
     showToast(error.message, "error");
   }
 }
@@ -651,7 +682,7 @@ function renderDebugLog(events) {
     const time = document.createElement("span");
     time.textContent = eventTime(event || {});
     const source = document.createElement("strong");
-    source.textContent = textValue(event?.source, "Источник неизвестен");
+    source.textContent = SOURCE_LABELS[event?.source] || textValue(event?.source, "Источник неизвестен");
     head.append(time, source);
     article.appendChild(head);
 
@@ -663,7 +694,7 @@ function renderDebugLog(events) {
     const metadata = document.createElement("div");
     metadata.className = "log-event-meta";
     const fields = [
-      ["Маршрут", event?.route],
+      ["Маршрут", event?.route ? ROUTE_LABELS[event.route] || event.route : null],
       ["Модель", event?.model],
       ["Время ответа", event?.durationMs === null || event?.durationMs === undefined ? null : `${event.durationMs} мс`],
     ];
@@ -752,14 +783,13 @@ $("ask").addEventListener("click", async () => {
   button.disabled = true;
   renderError($("ask-result"), "Выполняю запрос…");
   try {
-    await save({ silent: true });
+    if (state.dirty) await save({ silent: true });
     const result = await api("api/ask", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ text, speak: $("ask-speak").checked, source: "debug" }),
     });
     renderAskResult(result);
-    setDirty(false);
   } catch (error) {
     renderError($("ask-result"), error.message);
     showToast(error.message, "error");
@@ -791,13 +821,13 @@ $("pair").addEventListener("click", async () => {
     $("plugin-fingerprint").value = next.plugin.fingerprint || "—";
     $("pair-url").value = next.plugin.url;
     $("pair-code").value = "";
+    $("pair-details").open = false;
     $("pair-result").replaceChildren();
     const message = document.createElement("p");
     message.className = "result-text";
     message.textContent = `Готово. Device ID: ${textValue(result.device_id, "—")}`;
     $("pair-result").appendChild(message);
     updateOverview();
-    showToast("Колонка привязана");
   } catch (error) {
     renderError($("pair-result"), error.message);
     showToast(error.message, "error");
@@ -805,6 +835,14 @@ $("pair").addEventListener("click", async () => {
     button.disabled = false;
   }
 });
+
+for (const input of [$("pair-url"), $("pair-code")]) {
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    $("pair").click();
+  });
+}
 
 $("plugin-refresh").addEventListener("click", loadPluginStatus);
 $("log-refresh").addEventListener("click", loadDebugLog);
@@ -827,15 +865,22 @@ $("cancel-playback").addEventListener("click", async () => {
   }
 });
 
-$("form").addEventListener("input", () => { setDirty(true); updateOverview(); });
-$("form").addEventListener("change", () => { setDirty(true); updateOverview(); });
+function trackConfigChange(event) {
+  if (!(event.target instanceof Element)) return;
+  if (event.target.closest(".quick-ask") || event.target.closest("#pair-details")) return;
+  setDirty(true);
+  updateOverview();
+}
+
+$("form").addEventListener("input", trackConfigChange);
+$("form").addEventListener("change", trackConfigChange);
 $("form").addEventListener("submit", (event) => { event.preventDefault(); save().catch(() => undefined); });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeSidebar({ focusMenu: true });
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
     event.preventDefault();
-    save().catch(() => undefined);
+    if (state.dirty) save().catch(() => undefined);
   }
 });
 
@@ -845,7 +890,7 @@ window.addEventListener("beforeunload", (event) => {
   event.returnValue = "";
 });
 
-const initialPage = location.hash.slice(1);
+const initialPage = location.hash.slice(1) === "voice" ? "station" : location.hash.slice(1);
 renderLedColors(state.ledCount);
 showPage(PAGES[initialPage] ? initialPage : "overview", false);
 loadConfig().then(() => {

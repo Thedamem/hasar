@@ -156,7 +156,7 @@ app.setErrorHandler((error, request, reply) => {
   return reply.code(status).send({ error: publicError(error) });
 });
 
-app.get("/health", async () => ({ status: "ok", version: "0.2.1" }));
+app.get("/health", async () => ({ status: "ok", version: "0.3.0" }));
 
 app.get("/", async (_request, reply) => {
   return reply.type("text/html; charset=utf-8").send(ui);

@@ -20,6 +20,7 @@
       </div>
     </div>
     <nav class="nav" aria-label="Разделы">
+      <p class="nav-label">Настройка</p>
       <button class="nav-item active" type="button" data-page="overview" aria-current="page">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5"/><path d="M6.5 10.5V20h11v-9.5"/><path d="M10 20v-5h4v5"/></svg>
         <span>Обзор</span>
@@ -32,15 +33,11 @@
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h6.5l3.5 5H20"/><path d="M4 17h6.5l3.5-5"/><path d="m16 5 4 2-4 2"/></svg>
         <span>Маршрутизация</span>
       </button>
-      <button class="nav-item" type="button" data-page="voice">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h3l4 3V7l-4 3H4z"/><path d="M15 9.5a3.5 3.5 0 0 1 0 5"/><path d="M17.5 7a7 7 0 0 1 0 10"/></svg>
-        <span>Голос</span>
-      </button>
       <button class="nav-item" type="button" data-page="mcp">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V4M15 7V4"/><path d="M7 7h10v4a5 5 0 0 1-10 0V7z"/><path d="M12 16v4"/></svg>
         <span>MCP</span>
       </button>
-      <div class="nav-divider" role="presentation"></div>
+      <p class="nav-label">Устройство</p>
       <button class="nav-item" type="button" data-page="station">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"/><circle cx="12" cy="14" r="3"/><path d="M9 7h6"/></svg>
         <span>Колонка</span>
@@ -50,6 +47,10 @@
         <span>Отладка</span>
       </button>
     </nav>
+    <div class="sidebar-footer">
+      <span class="dot" id="conn-dot" aria-hidden="true"></span>
+      <span id="conn-text">Подключение…</span>
+    </div>
   </aside>
 
   <div class="scrim" id="scrim"></div>
@@ -64,87 +65,86 @@
         <span class="sub" id="page-subtitle">Настройки и состояние Hasar</span>
       </div>
       <div class="topbar-actions">
-        <span class="connection"><span class="dot" id="conn-dot" aria-hidden="true"></span><span id="conn-text">Подключение…</span></span>
         <span class="save-state" id="save-state" aria-live="polite"></span>
-        <button class="filled" type="button" id="save-top">Сохранить</button>
+        <button class="filled" type="button" id="save-top" disabled title="Нет изменений">Сохранить</button>
       </div>
     </header>
 
-    <main class="content" id="content">
+    <main class="content" id="content" tabindex="-1">
       <form id="form" novalidate>
         <section class="page-panel active" data-page-panel="overview">
-          <div class="overview-grid">
-            <div class="overview-main">
-              <section class="section-block quick-ask">
-                <div class="section-head">
-                  <div class="section-title">
-                    <h2>Быстрый тест</h2>
-                    <p class="section-note">Проверяет маршрут, модель и озвучку одним запросом.</p>
-                  </div>
-                </div>
-                <div class="ask-box">
-                  <label class="visually-hidden" for="ask-text">Текст запроса</label>
-                  <textarea id="ask-text" rows="3" placeholder="Например: включи свет в гостиной"></textarea>
-                  <div class="ask-actions">
-                    <label class="switch ask-speak" for="ask-speak">
-                      <input id="ask-speak" type="checkbox" checked>
-                      <span class="track"><span class="thumb"></span></span>
-                      Озвучить
-                    </label>
-                    <button class="filled" type="button" id="ask">Спросить</button>
-                  </div>
-                </div>
-                <div class="result" id="ask-result" aria-live="polite"></div>
-              </section>
-
-              <section class="section-block">
-                <div class="section-head">
-                  <div class="section-title"><h2>Состояние add-on</h2></div>
-                  <span id="state-health" class="inline-status">Проверка…</span>
-                </div>
-                <dl class="summary-list">
-                  <div><dt>Версия</dt><dd id="state-version">—</dd></div>
-                  <div><dt>Piper</dt><dd id="state-piper">—</dd></div>
-                  <div><dt>MCP</dt><dd id="state-mcp">—</dd></div>
-                  <div><dt>Gemini Live</dt><dd id="state-live">—</dd></div>
-                </dl>
-              </section>
+          <section class="section-block quick-ask">
+            <div class="section-head">
+              <div class="section-title">
+                <h2>Быстрый тест</h2>
+                <p class="section-note">Проверяет маршрут, модель и озвучку одним запросом. Текущие изменения формы сохраняются перед отправкой.</p>
+              </div>
             </div>
+            <div class="ask-box">
+              <label class="visually-hidden" for="ask-text">Текст запроса</label>
+              <textarea id="ask-text" rows="3" placeholder="Например: включи свет в гостиной"></textarea>
+              <div class="ask-actions">
+                <label class="switch ask-speak" for="ask-speak">
+                  <input id="ask-speak" type="checkbox" checked>
+                  <span class="track"><span class="thumb"></span></span>
+                  Озвучить
+                </label>
+                <button class="filled" type="button" id="ask">Спросить</button>
+              </div>
+            </div>
+            <div class="result" id="ask-result" aria-live="polite"></div>
+          </section>
 
-            <aside class="overview-side">
-              <section class="section-block">
-                <div class="section-head">
-                  <div class="section-title"><h2>Текущая конфигурация</h2></div>
-                </div>
-                <div class="status-line" aria-label="Текущая конфигурация">
-                  <div><span>Провайдер</span><strong id="overview-provider">—</strong></div>
-                  <div><span>Модель</span><strong id="overview-model">—</strong></div>
-                  <div><span>Маршрут</span><strong id="overview-route">—</strong></div>
-                  <div><span>Колонка</span><strong id="overview-station">—</strong></div>
-                </div>
-                <div class="side-actions">
-                  <button class="secondary" type="button" data-goto="models">Модели</button>
-                  <button class="secondary" type="button" data-goto="station">Колонка</button>
-                </div>
-              </section>
-            </aside>
-          </div>
+          <section class="section-flat">
+            <div class="section-head">
+              <div class="section-title">
+                <h2>Система</h2>
+                <p class="section-note">Текущие значения формы, включая несохранённые изменения.</p>
+              </div>
+            </div>
+            <dl class="meta-grid">
+              <div>
+                <dt>Провайдер и модель</dt>
+                <dd><strong id="overview-provider">—</strong><span class="meta-sub" id="overview-model">—</span></dd>
+              </div>
+              <div>
+                <dt>Маршрут</dt>
+                <dd id="overview-route">—</dd>
+              </div>
+              <div>
+                <dt>Колонка</dt>
+                <dd id="overview-station">—</dd>
+              </div>
+              <div>
+                <dt>Piper</dt>
+                <dd class="meta-sub" id="state-piper">—</dd>
+              </div>
+              <div>
+                <dt>MCP</dt>
+                <dd id="state-mcp">—</dd>
+              </div>
+              <div>
+                <dt>Gemini Live</dt>
+                <dd id="state-live">—</dd>
+              </div>
+            </dl>
+          </section>
         </section>
 
         <section class="page-panel" data-page-panel="models">
-          <section class="section-block">
+          <section class="section-flat">
             <div class="section-head">
               <div class="section-title">
                 <h2>Провайдер</h2>
                 <p class="section-note">Один активный провайдер для ответов модели.</p>
               </div>
             </div>
-            <div class="segmented provider-switch" role="group" aria-label="Выбор провайдера">
-              <button type="button" data-provider-choice="openai" aria-pressed="true">
+            <div class="segmented" role="group" aria-label="Выбор провайдера">
+              <button type="button" data-provider-choice="openai" aria-pressed="true" aria-controls="openai-card">
                 <span class="provider-name">OpenAI</span>
                 <span class="provider-desc">Chat Completions и MCP-инструменты</span>
               </button>
-              <button type="button" data-provider-choice="gemini" aria-pressed="false">
+              <button type="button" data-provider-choice="gemini" aria-pressed="false" aria-controls="gemini-card">
                 <span class="provider-name">Gemini</span>
                 <span class="provider-desc">AI Studio, chat и Live</span>
               </button>
@@ -228,76 +228,85 @@
           <section class="section-block">
             <div class="section-head">
               <div class="section-title">
-                <h2>Сеть</h2>
-                <p class="section-note">Прокси применяется к запросам моделей. MCP и Home Assistant соединяются напрямую.</p>
+                <h2>Поведение модели</h2>
+                <p class="section-note">Общий system prompt для chat- и Live-ответов.</p>
               </div>
             </div>
             <div class="form-grid">
-              <div><label for="socks5">SOCKS5 URL</label><input id="socks5" placeholder="socks5://host:port" spellcheck="false"></div>
+              <div class="full">
+                <label for="system-prompt">System prompt</label>
+                <textarea id="system-prompt" class="prompt" spellcheck="false"></textarea>
+              </div>
             </div>
           </section>
+
+          <details class="flat-details">
+            <summary>Сеть и прокси</summary>
+            <div class="flat-details-body">
+              <p class="hint">SOCKS5 применяется к запросам моделей и Gemini Live. MCP, Home Assistant и плагин соединяются напрямую.</p>
+              <div class="form-grid">
+                <div class="full"><label for="socks5">SOCKS5 URL</label><input id="socks5" placeholder="socks5://host:port" spellcheck="false"></div>
+              </div>
+            </div>
+          </details>
         </section>
 
         <section class="page-panel" data-page-panel="routing">
           <section class="section-block">
             <div class="section-head">
               <div class="section-title">
-                <h2>Правила обработки запросов</h2>
-                <p class="section-note">Сначала проверяются триггеры, затем режим и allowlist intent'ов.</p>
+                <h2>Маршрут запросов</h2>
+                <p class="section-note">Триггеры проверяются первыми, затем выбранный режим и allowlist intent'ов.</p>
               </div>
             </div>
+            <fieldset class="choice-group">
+              <legend class="visually-hidden">Режим маршрутизации</legend>
+              <label class="choice">
+                <input type="radio" name="routing-mode" value="auto">
+                <span class="choice-body">
+                  <span class="choice-title">Auto</span>
+                  <span class="choice-note">Dry-run intent. Assist получает только allowlist, остальное уходит в LLM.</span>
+                </span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="routing-mode" value="assist">
+                <span class="choice-body">
+                  <span class="choice-title">Только Assist</span>
+                  <span class="choice-note">Сначала локальный агент Home Assistant, при ошибке — LLM.</span>
+                </span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="routing-mode" value="llm">
+                <span class="choice-body">
+                  <span class="choice-title">Только LLM</span>
+                  <span class="choice-note">Все запросы идут в выбранную модель без локального разбора.</span>
+                </span>
+              </label>
+            </fieldset>
             <div class="form-grid">
-              <div>
-                <label for="routing-mode">Режим</label>
-                <select id="routing-mode">
-                  <option value="auto">Auto: Assist → LLM</option>
-                  <option value="assist">Только Assist</option>
-                  <option value="llm">Только LLM</option>
-                </select>
-                <div class="hint">Auto проверяет intent без выполнения действия, затем применяет allowlist.</div>
-              </div>
-              <div>
-                <label for="session-timeout">Длительность сессии, секунд</label>
-                <input id="session-timeout" type="number" min="10" max="3600">
-                <div class="hint">Пока не влияет на поведение — зарезервировано.</div>
-              </div>
               <div>
                 <label for="llm-triggers">Триггеры LLM</label>
                 <input id="llm-triggers" placeholder="хасар, спроси хасар">
-                <div class="hint">Срабатывают до выбора маршрута.</div>
+                <div class="hint">Подстроки без учёта регистра. Срабатывают до выбора режима.</div>
               </div>
               <div>
-                <label for="intent-allowlist">Разрешённые intent'ы</label>
-                <textarea id="intent-allowlist" rows="3" placeholder="HassTurnOn, HassTurnOff, HassGetState"></textarea>
-                <div class="hint">Через запятую или по одному в строке.</div>
-              </div>
-              <div class="full">
-                <label for="system-prompt">System prompt</label>
-                <textarea id="system-prompt" class="prompt" spellcheck="false"></textarea>
-                <div class="hint">Используется для ответов chat- и Live-моделей.</div>
+                <label for="session-timeout">Длительность сессии, секунд <span class="field-badge">не используется</span></label>
+                <input id="session-timeout" type="number" min="10" max="3600">
+                <div class="hint">Зарезервировано в конфигурации; pipeline пока не применяет значение.</div>
               </div>
             </div>
           </section>
-        </section>
 
-        <section class="page-panel" data-page-panel="voice">
           <section class="section-block">
             <div class="section-head">
               <div class="section-title">
-                <h2>Piper</h2>
-                <p class="section-note">Синтез речи по Wyoming и отправка WAV в плагин колонки.</p>
-              </div>
-              <span class="inline-status" id="piper-status">—</span>
-            </div>
-            <div class="form-grid">
-              <div><label for="piper-url">Wyoming URL</label><input id="piper-url" placeholder="tcp://core-piper:10200" spellcheck="false"></div>
-              <div><label for="piper-voice">Голос</label><input id="piper-voice" placeholder="Оставьте пустым для голоса по умолчанию"></div>
-              <div class="full voice-actions">
-                <span id="voice-plugin-status" class="inline-status">—</span>
-                <button class="secondary" type="button" data-goto="overview" data-focus="ask-text">Проверить ответ</button>
-                <span class="hint" id="voice-live-status"></span>
+                <h2>Assist и allowlist</h2>
+                <p class="section-note">Какие intent'ы можно отдавать локальному агенту. Остальные запросы уходят в LLM.</p>
               </div>
             </div>
+            <label for="intent-allowlist">Разрешённые intent'ы</label>
+            <textarea id="intent-allowlist" rows="5" placeholder="HassTurnOn, HassTurnOff, HassGetState"></textarea>
+            <div class="hint">Через запятую или по одному в строке.</div>
           </section>
         </section>
 
@@ -313,6 +322,7 @@
             <div class="empty-state" id="mcp-empty">Серверов пока нет. Нажмите «Добавить сервер», чтобы подключить инструменты.</div>
             <div class="mcp-list" id="mcp-list"></div>
             <div class="error" id="mcp-error" role="alert"></div>
+            <p class="hint">Имена инструментов получают префикс имени сервера. Ошибка одного сервера не блокирует остальные.</p>
           </section>
         </section>
 
@@ -320,34 +330,58 @@
           <section class="section-block">
             <div class="section-head">
               <div class="section-title">
-                <h2>Текущая привязка</h2>
+                <h2>YAM-плагин</h2>
                 <p class="section-note">Bearer-токен и fingerprint сертификата хранятся в add-on.</p>
               </div>
               <span class="inline-status" id="plugin-status">—</span>
             </div>
-            <div class="form-grid">
-              <div><label for="plugin-url">URL плагина</label><input id="plugin-url" placeholder="https://<station-ip>:8443" spellcheck="false"></div>
-              <div><label for="plugin-fingerprint">Fingerprint сертификата</label><input id="plugin-fingerprint" class="mono" readonly></div>
-              <div class="full">
-                <label for="plugin-token">Bearer-токен</label>
-                <div class="input-row">
-                  <input id="plugin-token" type="password" autocomplete="off" spellcheck="false">
-                  <button class="icon-button" type="button" data-reveal="plugin-token" aria-label="Показать токен"><span aria-hidden="true">•••</span></button>
-                </div>
-                <div class="hint">Секреты хранятся зашифрованными и после сохранения отображаются маской.</div>
-              </div>
-            </div>
-            <details class="advanced">
-              <summary>Привязать заново</summary>
+            <details class="advanced pairing" id="pair-details">
+              <summary>Привязка колонки</summary>
               <div class="form-grid">
                 <div><label for="pair-url">URL плагина</label><input id="pair-url" placeholder="https://<station-ip>:8443" spellcheck="false"></div>
                 <div><label for="pair-code">Код pairing</label><input id="pair-code" placeholder="Одноразовый код с колонки" autocomplete="off" spellcheck="false"></div>
                 <div class="full">
-                  <button class="secondary" type="button" id="pair">Привязать</button>
+                  <div class="pair-action">
+                    <button class="filled" type="button" id="pair">Привязать</button>
+                    <span class="hint">Код действует 10 минут и выдаётся колонкой.</span>
+                  </div>
                   <div class="result" id="pair-result" aria-live="polite"></div>
                 </div>
               </div>
             </details>
+            <div class="subsection">
+              <h3>Параметры подключения</h3>
+              <div class="form-grid">
+                <div><label for="plugin-url">URL плагина</label><input id="plugin-url" placeholder="https://<station-ip>:8443" spellcheck="false"></div>
+                <div><label for="plugin-fingerprint">Fingerprint сертификата</label><input id="plugin-fingerprint" class="mono" readonly></div>
+                <div class="full">
+                  <label for="plugin-token">Bearer-токен</label>
+                  <div class="input-row">
+                    <input id="plugin-token" type="password" autocomplete="off" spellcheck="false">
+                    <button class="icon-button" type="button" data-reveal="plugin-token" aria-label="Показать токен"><span aria-hidden="true">•••</span></button>
+                  </div>
+                  <div class="hint">Секреты хранятся зашифрованными и после сохранения отображаются маской.</div>
+                </div>
+              </div>
+            </div>
+            <div class="subsection">
+              <div class="subsection-head">
+                <div>
+                  <h3>Озвучивание</h3>
+                  <p class="section-note">Piper синтезирует WAV и отправляет его в плагин. Ответы Gemini Live приходят в колонку напрямую.</p>
+                </div>
+                <span class="inline-status" id="piper-status">—</span>
+              </div>
+              <div class="form-grid">
+                <div><label for="piper-url">Wyoming URL</label><input id="piper-url" placeholder="tcp://core-piper:10200" spellcheck="false"></div>
+                <div><label for="piper-voice">Голос</label><input id="piper-voice" placeholder="Оставьте пустым для голоса по умолчанию"></div>
+              </div>
+              <div class="status-strip">
+                <span id="voice-plugin-status" class="inline-status">—</span>
+                <span id="voice-live-status" class="inline-status"></span>
+                <button class="secondary" type="button" data-goto="overview" data-focus="ask-text">Проверить ответ</button>
+              </div>
+            </div>
           </section>
         </section>
       </form>
@@ -361,6 +395,16 @@
             </div>
             <dl class="debug-status" id="debug-plugin-status"><div><dt>Состояние</dt><dd>Загрузка…</dd></div></dl>
             <div class="error" id="debug-plugin-error" role="alert"></div>
+          </section>
+
+          <section class="section-block">
+            <div class="section-head">
+              <div class="section-title">
+                <h2>Воспроизведение</h2>
+                <p class="section-note">Останавливает текущий WAV в плагине.</p>
+              </div>
+            </div>
+            <div class="debug-actions"><button class="secondary" type="button" id="cancel-playback">Остановить воспроизведение</button><span class="inline-status" id="cancel-result" aria-live="polite"></span></div>
           </section>
 
           <section class="section-block">
@@ -386,13 +430,6 @@
               <div><label for="clock-brightness">Яркость</label><div class="range-row"><input id="clock-brightness" type="range" min="0" max="255" value="170"><output id="clock-brightness-value" for="clock-brightness">170</output></div></div>
               <div class="full debug-actions"><button class="secondary" type="button" id="clock-send">Отправить</button><button class="text-button" type="button" id="clock-off">Выключить часы</button><span class="inline-status" id="clock-result" aria-live="polite"></span></div>
             </div>
-          </section>
-
-          <section class="section-block">
-            <div class="section-head">
-              <div class="section-title"><h2>Воспроизведение</h2></div>
-            </div>
-            <div class="debug-actions"><button class="secondary" type="button" id="cancel-playback">Остановить воспроизведение</button><span class="inline-status" id="cancel-result" aria-live="polite"></span></div>
           </section>
 
           <section class="section-block debug-log-section">
