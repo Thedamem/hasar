@@ -115,7 +115,7 @@ function updateOverview() {
   $("overview-route").textContent = route === "assist" ? "Только Assist" : route === "llm" ? "Только LLM" : "Auto";
   $("overview-station").textContent = linked ? "Привязана" : "Не привязана";
 
-  $("state-mcp").textContent = $$(".mcp-entry").length ? `${$$(".mcp-entry").length} сервер(ов)` : "не настроены";
+  $("state-mcp").textContent = $$(".mcp-entry").length ? serverCountLabel($$(".mcp-entry").length) : "не настроены";
   $("state-piper").textContent = piperUrl || "не настроен";
   $("state-live").textContent = live ? "включён" : "выключен";
   $("state-version").textContent = state.health?.version || "—";
@@ -163,6 +163,22 @@ function splitList(value) {
   return value.split(/[\n,]/).map((item) => item.trim()).filter(Boolean);
 }
 
+function serverCountLabel(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} сервер`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} сервера`;
+  return `${count} серверов`;
+}
+
+function modelCountLabel(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} модель`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} модели`;
+  return `${count} моделей`;
+}
+
 function collectConfig() {
   if (!state.config) throw new Error("Конфигурация ещё не загружена.");
   const provider = checkedProvider();
@@ -204,7 +220,9 @@ function collectConfig() {
 
 async function save({ silent = false } = {}) {
   const button = $("save-top");
+  const label = button.textContent;
   button.disabled = true;
+  button.textContent = "Сохранение…";
   try {
     const saved = await api("api/config", {
       method: "PUT",
@@ -228,6 +246,7 @@ async function save({ silent = false } = {}) {
     throw error;
   } finally {
     button.disabled = false;
+    button.textContent = label;
   }
 }
 
@@ -259,7 +278,7 @@ async function refreshModels(provider, { quiet = false } = {}) {
     const liveSelect = isGemini ? $("gemini-live") : null;
     const previousLive = liveSelect?.value;
     if (liveSelect) fillSelect(liveSelect, liveModels, previousLive);
-    const count = isGemini ? `${chatModels.length} chat · ${liveModels.length} live` : `${chatModels.length} моделей`;
+    const count = isGemini ? `${chatModels.length} chat · ${liveModels.length} live` : modelCountLabel(chatModels.length);
     countNode.textContent = count;
     if (chatSelect.value !== previous || (liveSelect && liveSelect.value !== previousLive)) setDirty(true);
     updateOverview();
@@ -321,7 +340,7 @@ function addMcpCard(server = {}) {
 function updateMcpState() {
   const count = $$(".mcp-entry").length;
   $("mcp-empty").classList.toggle("hidden", count > 0);
-  $("mcp-count").textContent = count ? `${count} сервер(ов)` : "0 серверов";
+  $("mcp-count").textContent = serverCountLabel(count);
   updateOverview();
 }
 
@@ -367,14 +386,15 @@ function renderAskResult(result) {
   meta.className = "result-meta";
   const labels = { assist: "Assist", chat: "LLM", "gemini-live": "Gemini Live" };
   const audioLabels = { played: "Аудио отправлено", skipped: "Без озвучки", failed: "Ошибка аудио" };
-  const addMeta = (text) => {
+  const addMeta = (text, className = "") => {
     const item = document.createElement("span");
     item.textContent = text;
+    if (className) item.className = className;
     meta.appendChild(item);
   };
   addMeta(`Маршрут: ${labels[result.route] || result.route || "—"}`);
   if (result.intent) addMeta(`Intent: ${result.intent}`);
-  if (result.audio) addMeta(audioLabels[result.audio] || `Аудио: ${result.audio}`);
+  if (result.audio) addMeta(audioLabels[result.audio] || `Аудио: ${result.audio}`, result.audio === "failed" ? "result-meta-error" : "");
   const text = document.createElement("p");
   text.className = "result-text";
   text.textContent = result.text || "(пустой ответ)";
@@ -410,8 +430,11 @@ function showPage(name, updateHash = true) {
   }
 }
 
-function closeSidebar() {
+function closeSidebar({ focusMenu = false } = {}) {
   document.body.classList.remove("sidebar-open");
+  $("menu").setAttribute("aria-expanded", "false");
+  $("menu").setAttribute("aria-label", "Открыть меню");
+  if (focusMenu) $("menu").focus();
 }
 
 async function loadHealth() {
@@ -607,10 +630,10 @@ async function sendClock(off = false) {
 
 function eventTime(event) {
   const value = event.time ?? event.timestamp ?? event.createdAt ?? event.at;
-  if (typeof value === "number") return new Date(value).toLocaleString();
+  if (typeof value === "number") return new Date(value).toLocaleString("ru-RU");
   if (typeof value === "string") {
     const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? value : new Date(parsed).toLocaleString();
+    return Number.isNaN(parsed) ? value : new Date(parsed).toLocaleString("ru-RU");
   }
   return "Время неизвестно";
 }
@@ -682,8 +705,12 @@ for (const button of $$('[data-goto]')) {
   });
 }
 
-$("menu").addEventListener("click", () => document.body.classList.add("sidebar-open"));
-$("scrim").addEventListener("click", closeSidebar);
+$("menu").addEventListener("click", () => {
+  document.body.classList.add("sidebar-open");
+  $("menu").setAttribute("aria-expanded", "true");
+  $("menu").setAttribute("aria-label", "Закрыть меню");
+});
+$("scrim").addEventListener("click", () => closeSidebar({ focusMenu: true }));
 window.addEventListener("hashchange", () => showPage(location.hash.slice(1) || "overview", false));
 
 for (const button of $$("[data-provider-choice]")) {
@@ -805,7 +832,7 @@ $("form").addEventListener("change", () => { setDirty(true); updateOverview(); }
 $("form").addEventListener("submit", (event) => { event.preventDefault(); save().catch(() => undefined); });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") closeSidebar();
+  if (event.key === "Escape") closeSidebar({ focusMenu: true });
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
     event.preventDefault();
     save().catch(() => undefined);
